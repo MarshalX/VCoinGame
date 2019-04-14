@@ -322,6 +322,9 @@ class Messages:
 
 class Bot:
     def __init__(self, group_id, group_token, coin_api):
+        self.lose_img = os.environ.get('LOSE_IMG')
+        self.win_img = os.environ.get('WIN_IMG')
+
         self.coin_api = coin_api
         self.session = vk_api.VkApi(token=group_token)
         self.bot = VkBotLongPoll(self.session, group_id)
@@ -340,7 +343,7 @@ class Bot:
         add_button(self.main_keyboard, 'Баланс')
         add_button(self.main_keyboard, 'Вывести')
 
-    def send_message(self, id, message, keyboard=None):
+    def send_message(self, id, message, keyboard=None, attachment=None):
         if not keyboard:
             keyboard = self.main_keyboard
 
@@ -348,6 +351,7 @@ class Bot:
             peer_id=id,
             random_id=get_random_id(),
             keyboard=keyboard.get_keyboard(),
+            attachment=attachment if attachment else '',
             message=message
         )
 
@@ -378,12 +382,12 @@ class Bot:
                             score -= game.bet
                             if game.play():
                                 logger.info(f'{user_id} проиграл')
-                                self.send_message(user_id, Messages.Lose)
+                                self.send_message(user_id, Messages.Lose, attachment=self.lose_img)
                             else:
                                 logger.info(f'{user_id} выиграл {game.cur_reward / 1000}. '
                                             f'След. ставка {game.cur_reward / 1000}')
                                 self.send_message(user_id, Messages.Win.format(
-                                    game.cur_reward / 1000, game.cur_reward / 1000))
+                                    game.cur_reward / 1000, game.cur_reward / 1000), attachment=self.win_img)
                     elif message == 'баланс':
                         logger.info(f'{user_id} посмотрел свой баланс')
                         self.send_message(user_id, Messages.Score.format(score.print()))
