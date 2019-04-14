@@ -28,7 +28,7 @@ console_handler = logging.StreamHandler()
 console_handler.setFormatter(logFormatter)
 
 logger.addHandler(console_handler)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") is None else logging.INFO)
 
 
 class Database:
@@ -127,6 +127,8 @@ class CoinAPI:
         params.update({'tx': [1] if to_merchant else [2]})
 
         response = CoinAPI._send_request(method_url, json.dumps(params))
+        logger.debug(response)
+
         transactions = [Transaction.to_python(transaction) for transaction in response]
 
         return transactions
@@ -138,7 +140,7 @@ class CoinAPI:
         params.update({'toId': to_id})
         params.update({'amount': amount})
 
-        CoinAPI._send_request(method_url, json.dumps(params))
+        logger.debug(CoinAPI._send_request(method_url, json.dumps(params)))
 
     def create_transaction_url(self, amount, fixed=True):
         def to_hex(dec):
@@ -185,6 +187,7 @@ class Score(Database):
         cursor.close()
 
     def _update(self, sql_query, amount):
+        logger.debug(f'SQL: {sql_query}; {amount}, {self.user_id}')
         cursor = self.connection.cursor()
         cursor.execute(sql_query, (amount, self.user_id))
         self.connection.commit()
@@ -221,8 +224,8 @@ class Score(Database):
 
 
 class Game(Database):
-    INITIAL_RATE = 10_000_000
-    WIN_RATE = 10
+    INITIAL_RATE = int(os.environ.get('INITIAL_RATE'))
+    WIN_RATE = int(os.environ.get('WIN_RATE'))
 
     def __init__(self, user_id):
         super().__init__()
@@ -252,6 +255,7 @@ class Game(Database):
         return result
 
     def _update(self, sql_query, value):
+        logger.debug(f'SQL: {sql_query}; {value}, {self.user_id}')
         cursor = self.connection.cursor()
         cursor.execute(sql_query, (value, self.user_id))
         self.connection.commit()
@@ -289,7 +293,15 @@ class Game(Database):
 
 
 class Messages:
-    Commands = """Упс, такой команды нет. Попробуйте ещё раз!"""
+    Commands = """Привет! 
+
+Со мной ты можешь поиграть в игру Орёл и Решка! Я люблю играть за орла, значит ты будешь играть за решку :)
+
+Начальная ставка составляет {}. Каждый раз, когда ты подбрасываешь монету, с твоего счёта будет списываться соответствующая сумма. Если ты выиграл, ты можешь забрать приз или продолжить играть.
+
+Если ты хочешь попытать удачу и сыграть еще раз, то новая ставка будет в два раза больше старой. Не волнуйся, твой возможный приз увеличивается в два раза вместе со ставкой!
+
+Да прибудет с тобой удача, джедай..."""
     Score = """Ваш баланс: {}"""
     DepositFixed = """Пополнить счет на {} можно по следующей ссылке: {}"""
     Deposit = """Пополнить счет можно по следующей ссылке: {}"""
@@ -350,35 +362,45 @@ class Bot:
                     amount = Score.parse_score(message)
 
                     if game.in_progress and message == 'забрать приз':
+                        logger.info(f'{user_id} забрал приз в размере {game.cur_reward / 1000} коинов')
                         self.send_message(user_id, Messages.PickUp.format(game.cur_reward / 1000))
                         score += game.cur_reward
                         game.end_game()
                     elif not game.in_progress and message == 'забрать приз':
                         self.send_message(user_id, Messages.NoWin)
                     elif message == 'подкинуть монетку':
+                        logger.info(f'{user_id} подкинул монетку')
                         if game.bet > score.get():
+                            logger.info(f'У {user_id} не хватает средств для броска ({game.bet} > {score.get()})')
                             self.send_message(user_id, Messages.Bum)
                         else:
                             score -= game.bet
                             if game.play():
+                                logger.info(f'{user_id} проиграл')
                                 self.send_message(user_id, Messages.Lose)
                             else:
+                                logger.info(f'{user_id} выиграл {game.cur_reward / 1000}. '
+                                            f'След. ставка {game.cur_reward / 1000}')
                                 self.send_message(user_id, Messages.Win.format(
                                     game.cur_reward / 1000, game.cur_reward / 1000))
                     elif message == 'баланс':
+                        logger.info(f'{user_id} посмотрел свой баланс')
                         self.send_message(user_id, Messages.Score.format(score.print()))
                     elif message.startswith('пополнить'):
+                        logger.info(f'{user_id} хочет пополнить баланс')
                         if amount:
                             self.send_message(user_id, Messages.DepositFixed.format(
                                 amount / 1000, coin_api.create_transaction_url(amount)))
                         else:
                             self.send_message(user_id, Messages.Deposit.format(
-                                coin_api.create_transaction_url(3_000_000, False)))
+                                coin_api.create_transaction_url(0, False)))
                     elif message.startswith('вывести'):
+                        logger.info(f'{user_id} хочет вывести баланс')
                         if amount:
                             if amount > score.get():
                                 self.send_message(user_id, Messages.Bum)
                             else:
+                                logger.info(f'{user_id} вывел {amount / 1000}')
                                 score -= amount
                                 coin_api.send(user_id, amount)
 
@@ -409,6 +431,7 @@ if __name__ == '__main__':
         all_transactions = transaction_manager.get_all_ids()
         for transaction in coin_api.get_transactions():
             if transaction.id not in all_transactions:
+                logger.info(f'{transaction.from_id} пополнил баланс на {transaction.amount / 1000}')
                 transaction.save()
                 score = Score(transaction.from_id)
                 score += transaction.amount
