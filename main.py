@@ -182,7 +182,7 @@ class Score(Database):
 
     def create(self):
         cursor = self.connection.cursor()
-        cursor.execute("INSERT INTO user_scores (user_id, score) VALUES (%s, 0)", (self.user_id,))
+        cursor.execute("INSERT INTO user_scores (user_id, score) VALUES (%s, %s)", (self.user_id, Game.INITIAL_RATE))
         self.connection.commit()
         cursor.close()
 
@@ -437,7 +437,8 @@ if __name__ == '__main__':
     @scheduler.scheduled_job(trigger='interval', seconds=5)
     def update_status():
         all_transactions = transaction_manager.get_all_ids()
-        for transaction in coin_api.get_transactions():
+        transactions = coin_api.get_transactions().extend(coin_api.get_transactions(False))
+        for transaction in transactions:
             if transaction.id not in all_transactions:
                 logger.info(f'{transaction.from_id} пополнил баланс на {transaction.amount / 1000}')
                 transaction.save()
