@@ -11,6 +11,7 @@ from datetime import datetime
 
 from vk_api import vk_api
 from vk_api.utils import get_random_id
+from vk_api.exceptions import ApiError
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
