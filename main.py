@@ -382,7 +382,7 @@ class Bot:
                         if game.bet > score.get():
                             logger.info(f'У {user_id} не хватает средств для броска ({game.bet} > {score.get()})')
                             
-                            self.send_message(user_id, Messages.BumLeft.format((game.bet - score.bet()) / 1000))
+                            self.send_message(user_id, Messages.BumLeft.format((game.bet - score.get()) / 1000))
                         else:
                             score -= game.bet
                             if game.play():
