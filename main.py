@@ -226,15 +226,20 @@ class Messages:
     Replenish = """Пополнить счет на {} можно по следующей ссылку: {}"""
     ReplenishError = """Пожалуйста, используйте команду правильно!
     
-!пополнить <количество>"""
+Пополнить <количество>"""
     Withdraw = """Для вывода средств пососите жопу"""
     WithdrawError = """Пожалуйста, используйте команду правильно!
 
-!вывести <количество>"""
+Вывести <количество>"""
 
     Bum = """Вы бомж, у Вас столько нет!"""
     Send = """{} монет было успешно выведено!"""
     Credited = """{} успешно зачислены на Ваш баланс!"""
+    PickUp = """Вы забрали приз в размере {}"""
+    Lose = """Вы проиграли"""
+    Win = """Опа, решка, поздравляю! Текущий приз: {}. 
+Сыграем еще? Новая ставка составляет {}"""
+    NoWin = """Ты ничего не выиграл"""
 
 
 class Game(Database):
@@ -245,7 +250,7 @@ class Game(Database):
         super().__init__()
 
         self.user_id = user_id
-        self.round = self.get_rounds()
+        self.round = self.get_round()
 
     @staticmethod
     def random():
@@ -260,7 +265,7 @@ class Game(Database):
         else:
             return False
 
-    def get_rounds(self):
+    def get_round(self):
         cursor = self.connection.cursor()
         cursor.execute("SELECT round FROM user_scores WHERE user_id = %s", (self.user_id,))
         result = cursor.fetchone()[0]
@@ -295,6 +300,10 @@ class Game(Database):
     @property
     def bet(self):
         return Game.INITIAL_RATE if self.round == -1 else Game.INITIAL_RATE * (2 ** self.round)
+
+    @property
+    def cur_reward(self):
+        return self.bet * 2
 
     @property
     def reward(self):
@@ -344,21 +353,21 @@ class Bot:
                     amount = Score.parse_score(message)
 
                     if game.in_progress and message == 'забрать приз':
-                        self.send_message(user_id, 'Вы забрали {}'.format(game.reward / 1000))
-                        score += game.reward
+                        self.send_message(user_id, Messages.PickUp.format(game.cur_reward / 1000))
+                        score += game.cur_reward
                         game.end_game()
                     elif not game.in_progress and message == 'забрать приз':
-                        self.send_message(user_id, 'Ты ничего не выиграл')
+                        self.send_message(user_id, Messages.NoWin)
                     elif message == 'подкинуть монетку':
                         if game.bet > score.get():
-                            self.send_message(user_id, 'Бомж, у тебя нет {}'.format(game.bet / 1000))
+                            self.send_message(user_id, Messages.Bum)
                             game.end_game()
                         else:
                             score -= game.bet
                             if game.play():
-                                self.send_message(user_id, 'Вы проиграли, выпал орел :(')
+                                self.send_message(user_id, Messages.Lose)
                             else:
-                                self.send_message(user_id, 'Опа, решка, поздравляю! Сыграем еще? Текущий приз: {}'.format(game.bet / 1000))
+                                self.send_message(user_id, Messages.Win.format(game.cur_reward / 1000, game.cur_reward / 1000))
                     elif message == 'баланс':
                         self.send_message(user_id, Messages.Score.format(score.print()))
                     elif message.startswith('пополнить'):
