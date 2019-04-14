@@ -239,6 +239,7 @@ class Messages:
 
 class Game(Database):
     INITIAL_RATE = 10_000_000
+    WIN_RATE = 10
 
     def __init__(self, user_id):
         super().__init__()
@@ -248,17 +249,15 @@ class Game(Database):
 
     @staticmethod
     def random():
-        return random.randint(0, 1)
+        return random.randint(0, 100) <= Game.WIN_RATE
 
     def play(self):
-        if not self.in_progress:
-            self.start_game()
+        self.__add__(1)
 
         if Game.random():
             self.end_game()
             return True
         else:
-            self.__add__(1)
             return False
 
     def get_rounds(self):
@@ -295,7 +294,8 @@ class Game(Database):
 
     @property
     def bet(self):
-        return Game.INITIAL_RATE * (2 ** (self.round - 1))
+        print(self.round)
+        return Game.INITIAL_RATE * (2 ** self.round)
 
     @property
     def reward(self):
@@ -349,18 +349,20 @@ class Bot:
 
                     if game.in_progress:
                         if message == 'подкинуть ещё раз':
+                            self.send_message(user_id, 'Типо забрал {}'.format(game.bet / 1000))
                             if game.play():
                                 self.send_message(user_id, 'Вы проиграли, выпал орел :(')
                             else:
                                 self.send_message(user_id, 'Опа, решка, поздравляю! Сыграем еще?',
                                                   keyboard=self.game_keyboard)
                         elif message == 'забрать приз':
-                            game.end_game()
                             self.send_message(user_id, 'Типо выдал {}'.format(game.reward / 1000),)
+                            game.end_game()
                         else:
                             self.send_message(user_id, 'Ты в игре!', keyboard=self.game_keyboard)
 
                     elif message == 'подкинуть монетку':
+                        self.send_message(user_id, 'Типо забрал {}'.format(game.bet / 1000))
                         if game.play():
                             self.send_message(user_id, 'Вы проиграли, выпал орел :(')
                         else:
