@@ -507,7 +507,7 @@ if __name__ == '__main__':
                 score += transaction.amount
                 score.connection.close()
 
-                bot.send_message(transaction.from_id, Messages.Credited.format(transaction.amount / 1000))
+                bot._send_message(transaction.from_id, Messages.Credited.format(transaction.amount / 1000))
 
     scheduler.start()
     bot.start()
