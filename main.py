@@ -48,8 +48,23 @@ class TransactionManager(Database):
 
         return result
 
+    def save_transaction(self, transaction):
+        cursor = self.connection.cursor()
+        cursor.execute("INSERT INTO transactions (from_id, to_id, amount, created_at, tid) SELECT %s, %s, %s, %s, %s "
+                       "WHERE NOT EXISTS ( "
+                       "    SELECT id FROM transactions WHERE tid = %s)",
+                       (transaction.from_id, transaction.to_id, transaction.amount,
+                        datetime.fromtimestamp(transaction.created_at), transaction.id,
+                        transaction.id))
+        self.connection.commit()
+        cursor.close()
 
-class Transaction(Database):
+    def save_transactions(self, transactions):
+        for transaction in transactions:
+            self.save_transaction(transaction)
+
+
+class Transaction:
     class Type(Enum):
         FROM_USER_TO_USER = 3
         FROM_USER_TO_MERCHANT = 4
@@ -73,15 +88,6 @@ class Transaction(Database):
         self.payload = payload
         self.external_id = external_id
         self.created_at = created_at
-
-    def save(self):
-        cursor = self.connection.cursor()
-        cursor.execute("INSERT INTO transactions (from_id, to_id, amount, created_at, tid) SELECT %s, %s, %s, %s, %s "
-                       "WHERE NOT EXISTS ( "
-                       "    SELECT id FROM transactions WHERE tid = %s)",
-                       (self.from_id, self.to_id, self.amount, datetime.fromtimestamp(self.created_at), self.id, self.id))
-        self.connection.commit()
-        cursor.close()
 
     @staticmethod
     def to_python(transaction):
@@ -442,13 +448,17 @@ if __name__ == '__main__':
     @scheduler.scheduled_job(trigger='interval', seconds=5)
     def update_status():
         all_transactions = transaction_manager.get_all_ids()
-        transactions = coin_api.get_transactions().extend(coin_api.get_transactions(False))
+        transactions = coin_api.get_transactions()
+        transactions.extend(coin_api.get_transactions(False))
         for transaction in transactions:
             if transaction.id not in all_transactions:
                 logger.info(f'{transaction.from_id} пополнил баланс на {transaction.amount / 1000}')
-                transaction.save()
+                transaction_manager.save_transaction(transaction)
+
                 score = Score(transaction.from_id)
                 score += transaction.amount
+                score.connection.close()
+
                 bot.send_message(transaction.from_id, Messages.Credited.format(transaction.amount / 1000))
 
     scheduler.start()
