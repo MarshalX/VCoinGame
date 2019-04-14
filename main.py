@@ -220,28 +220,6 @@ class Score(Database):
         return int(float(finds[0].replace(',', '.')) * 1000) if len(finds) else None
 
 
-class Messages:
-    Commands = """Da, net, mda"""
-    Score = """Ваш баланс: {}"""
-    Replenish = """Пополнить счет на {} можно по следующей ссылку: {}"""
-    ReplenishError = """Пожалуйста, используйте команду правильно!
-    
-Пополнить <количество>"""
-    Withdraw = """Для вывода средств пососите жопу"""
-    WithdrawError = """Пожалуйста, используйте команду правильно!
-
-Вывести <количество>"""
-
-    Bum = """Вы бомж, у Вас столько нет!"""
-    Send = """{} монет было успешно выведено!"""
-    Credited = """{} успешно зачислены на Ваш баланс!"""
-    PickUp = """Вы забрали приз в размере {}"""
-    Lose = """Вы проиграли"""
-    Win = """Опа, решка, поздравляю! Текущий приз: {}. 
-Сыграем еще? Новая ставка составляет {}"""
-    NoWin = """Ты ничего не выиграл"""
-
-
 class Game(Database):
     INITIAL_RATE = 10_000_000
     WIN_RATE = 10
@@ -310,6 +288,25 @@ class Game(Database):
         return Game.INITIAL_RATE * (2 ** self.round)
 
 
+class Messages:
+    Commands = """Упс, такой команды нет. Попробуйте ещё раз!"""
+    Score = """Ваш баланс: {}"""
+    DepositFixed = """Пополнить счет на {} можно по следующей ссылке: {}"""
+    Deposit = """Пополнить счет можно по следующей ссылке: {}"""
+    WithdrawError = """Пожалуйста, используйте команду правильно!
+
+Вывести <количество>"""
+
+    Bum = """На Вашем баланс недостаточно средств. Вы можете пополнить его с помощью команды Пополнить <количество>"""
+    Send = """{} монет было успешно выведено!"""
+    Credited = """{} монет успешно зачислены на Ваш баланс!"""
+    PickUp = """Вы забрали приз в размере {}"""
+    Lose = """Выпал орёл, Вы проиграли :("""
+    Win = """Опа, решка, поздравляю! Текущий приз: {}. 
+Сыграем еще? Новая ставка составляет {}"""
+    NoWin = """Ты ничего не выиграл"""
+
+
 class Bot:
     def __init__(self, group_id, group_token, coin_api):
         self.coin_api = coin_api
@@ -361,21 +358,22 @@ class Bot:
                     elif message == 'подкинуть монетку':
                         if game.bet > score.get():
                             self.send_message(user_id, Messages.Bum)
-                            game.end_game()
                         else:
                             score -= game.bet
                             if game.play():
                                 self.send_message(user_id, Messages.Lose)
                             else:
-                                self.send_message(user_id, Messages.Win.format(game.cur_reward / 1000, game.cur_reward / 1000))
+                                self.send_message(user_id, Messages.Win.format(
+                                    game.cur_reward / 1000, game.cur_reward / 1000))
                     elif message == 'баланс':
                         self.send_message(user_id, Messages.Score.format(score.print()))
                     elif message.startswith('пополнить'):
                         if amount:
-                            self.send_message(user_id, Messages.Replenish.format(
+                            self.send_message(user_id, Messages.DepositFixed.format(
                                 amount / 1000, coin_api.create_transaction_url(amount)))
                         else:
-                            self.send_message(user_id, Messages.ReplenishError)
+                            self.send_message(user_id, Messages.Deposit.format(
+                                coin_api.create_transaction_url(3_000_000, False)))
                     elif message.startswith('вывести'):
                         if amount:
                             if amount > score.get():
