@@ -318,27 +318,20 @@ class Messages:
     Score = """💰 Ваш баланс: {}"""
     DepositFixed = """Пополнить счет на {} можно по следующей ссылке: {}"""
     Deposit = """Пополнить счет можно по следующей ссылке: {}"""
-    WithdrawError = """Пожалуйста, используйте команду правильно!
-
-Вывести <количество>
-
-Пример:
-Вывести 200
-💰 Будет выведено 200 коинов"""
+    Withdraw = """Пожалуйста, напишите сколько хотите вывести"""
+    WithdrawError = """Вы неправильно ввели значение... Попробуйте ещё раз"""
 
     Bum = """😢 На Вашем баланс недостаточно средств.
     
 Вы можете пополнить его с помощью команды
 Пополнить <количество>"""
-    BumLeft = """😢 На Вашем баланс не хватает {} монет, чтобы сделать ставку!
+    BumLeft = """😢 На Вашем балансе не хватает {} монет, чтобы сделать ставку!
     
-Вы можете пополнить его с помощью команды
-Пополнить <количество>"""
+Вы можете пополнить его нажав на кнопку "Пополнить" """
 
-    Reward = """😢 На Вашем баланс не хватает {} монет, чтобы сделать ставку!
+    Reward = """😢 На Вашем балансе не хватает {} монет, чтобы сделать ставку!
     
-Вы можете пополнить его с помощью команды
-Пополнить <количество>
+Вы можете пополнить его нажав на кнопку "Пополнить"
 
 Также Вы можете забрать свой текущий приз."""
     Send = """✅ {} монет было успешно выведено!"""
@@ -359,6 +352,8 @@ class Bot:
         self.lose_img = os.environ.get('LOSE_IMG')
         self.win_img = os.environ.get('WIN_IMG')
 
+        self.withdraw = []
+
         self.coin_api = coin_api
         self.session = vk_api.VkApi(token=group_token)
         self.bot = VkBotLongPoll(self.session, group_id)
@@ -371,15 +366,22 @@ class Bot:
 
         add_button(self.main_keyboard, 'Подкинуть монетку', color=VkKeyboardColor.POSITIVE)
         self.main_keyboard.add_line()
-        add_button(self.main_keyboard, 'Забрать приз')
-        self.main_keyboard.add_line()
         add_button(self.main_keyboard, 'Пополнить')
         add_button(self.main_keyboard, 'Баланс')
         add_button(self.main_keyboard, 'Вывести')
 
-    def send_message(self, id, message, keyboard=None, attachment=None):
-        if not keyboard:
-            keyboard = self.main_keyboard
+        self.game_keyboard = VkKeyboard(one_time=False)
+
+        add_button(self.game_keyboard, 'Подкинуть монетку', color=VkKeyboardColor.POSITIVE)
+        self.game_keyboard.add_line()
+        add_button(self.game_keyboard, 'Забрать приз')
+        self.game_keyboard.add_line()
+        add_button(self.game_keyboard, 'Пополнить')
+        add_button(self.game_keyboard, 'Баланс')
+        add_button(self.game_keyboard, 'Вывести')
+
+    def _send_message(self, id, message, attachment=None, game=False):
+        keyboard = self.game_keyboard if game else self.main_keyboard
 
         self.api.messages.send(
             peer_id=id,
@@ -396,70 +398,78 @@ class Bot:
                 score = Score(user_id)
                 game = Game(user_id)
 
+                def send_message(id, message, attachment=None):
+                    self._send_message(id, message, attachment, game.in_progress)
+
                 if 'text' in event.object:
                     message = event.object.text.strip().lower()
                     amount = Score.parse_score(message)
 
                     if game.in_progress and message == 'забрать приз':
                         logger.info(f'{user_id} забрал приз в размере {game.cur_reward / 1000} коинов')
-                        self.send_message(user_id, Messages.PickUp.format(game.cur_reward / 1000))
+                        send_message(user_id, Messages.PickUp.format(game.cur_reward / 1000))
                         score += game.cur_reward
                         game.end_game()
                     elif not game.in_progress and message == 'забрать приз':
-                        self.send_message(user_id, Messages.NoWin)
+                        send_message(user_id, Messages.NoWin)
                     elif message == 'подкинуть монетку':
                         logger.info(f'{user_id} подкинул монетку')
                         if game.bet > score.get():
                             logger.info(f'У {user_id} не хватает средств для броска ({game.bet} > {score.get()})')
 
                             if not game.in_progress:
-                                self.send_message(user_id, Messages.BumLeft.format((game.bet - score.get()) / 1000))
+                                send_message(user_id, Messages.BumLeft.format((game.bet - score.get()) / 1000))
                             else:
-                                self.send_message(user_id, Messages.Reward.format((game.bet - score.get()) / 1000))
+                                send_message(user_id, Messages.Reward.format((game.bet - score.get()) / 1000))
                         else:
                             score -= game.bet
                             if game.play():
                                 logger.info(f'{user_id} проиграл')
-                                self.send_message(user_id, Messages.Lose, attachment=self.lose_img)
+                                send_message(user_id, Messages.Lose, attachment=self.lose_img)
                             else:
                                 logger.info(f'{user_id} выиграл {game.cur_reward / 1000}. '
                                             f'След. ставка {game.cur_reward / 1000}')
-                                self.send_message(user_id, Messages.Win.format(
+                                send_message(user_id, Messages.Win.format(
                                     game.cur_reward / 1000, game.bet / 1000), attachment=self.win_img)
                     elif message == 'баланс':
                         logger.info(f'{user_id} посмотрел свой баланс')
                         if game.in_progress:
-                            self.send_message(user_id, Messages.ScoreReward.format(score.print(), game.cur_reward / 1000))
+                            send_message(user_id, Messages.ScoreReward.format(score.print(), game.cur_reward / 1000))
                         else:
-                            self.send_message(user_id, Messages.Score.format(score.print()))
+                            send_message(user_id, Messages.Score.format(score.print()))
                     elif message.startswith('пополнить'):
                         logger.info(f'{user_id} хочет пополнить баланс')
                         if amount:
-                            self.send_message(user_id, Messages.DepositFixed.format(
+                            send_message(user_id, Messages.DepositFixed.format(
                                 amount / 1000, coin_api.create_transaction_url(amount)))
                         else:
-                            self.send_message(user_id, Messages.Deposit.format(
+                            send_message(user_id, Messages.Deposit.format(
                                 coin_api.create_transaction_url(0, False)))
-                    elif message.startswith('вывести'):
+                    elif message == 'вывести' and user_id not in self.withdraw:
+                        self.withdraw.append(user_id)
+                        send_message(user_id, Messages.Withdraw)
+                    elif user_id in self.withdraw:
                         logger.info(f'{user_id} хочет вывести баланс')
+                        del self.withdraw[self.withdraw.index(user_id)]
                         if amount:
                             if amount > score.get():
-                                self.send_message(user_id, Messages.Bum)
                                 if game.in_progress:
-                                    self.send_message(user_id, Messages.ScoreReward.format(score.print(),
-                                                                                           game.cur_reward / 1000))
+                                    send_message(user_id, Messages.Bum + Messages.ScoreReward.format(
+                                        score.print(), game.cur_reward / 1000))
+                                else:
+                                    send_message(user_id, Messages.Bum)
                             else:
                                 logger.info(f'{user_id} вывел {amount / 1000}')
                                 score -= amount
                                 coin_api.send(user_id, amount)
 
-                                self.send_message(user_id, Messages.Send.format(amount / 1000))
+                                send_message(user_id, Messages.Send.format(amount / 1000))
                         else:
-                            self.send_message(user_id, Messages.WithdrawError)
+                            send_message(user_id, Messages.WithdrawError)
                     else:
-                        self.send_message(user_id, Messages.Commands.format(Game.INITIAL_RATE / 1000))
+                        send_message(user_id, Messages.Commands.format(Game.INITIAL_RATE / 1000))
                 else:
-                    self.send_message(user_id, Messages.Commands.format(Game.INITIAL_RATE / 1000))
+                    send_message(user_id, Messages.Commands.format(Game.INITIAL_RATE / 1000))
 
                 score.connection.close()
                 game.connection.close()
