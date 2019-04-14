@@ -407,9 +407,11 @@ class Bot:
 
                     if game.in_progress and message == 'забрать приз':
                         logger.info(f'{user_id} забрал приз в размере {game.cur_reward / 1000} коинов')
-                        send_message(user_id, Messages.PickUp.format(game.cur_reward / 1000))
+
                         score += game.cur_reward
                         game.end_game()
+
+                        send_message(user_id, Messages.PickUp.format(game.cur_reward / 1000))
                     elif not game.in_progress and message == 'забрать приз':
                         send_message(user_id, Messages.NoWin)
                     elif message == 'подкинуть монетку':
