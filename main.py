@@ -383,13 +383,16 @@ class Bot:
     def _send_message(self, id, message, attachment=None, game=False):
         keyboard = self.game_keyboard if game else self.main_keyboard
 
-        self.api.messages.send(
-            peer_id=id,
-            random_id=get_random_id(),
-            keyboard=keyboard.get_keyboard(),
-            attachment=attachment if attachment else '',
-            message=message
-        )
+        try:
+            self.api.messages.send(
+                peer_id=id,
+                random_id=get_random_id(),
+                keyboard=keyboard.get_keyboard(),
+                attachment=attachment if attachment else '',
+                message=message
+            )
+        except ApiError as e:
+            logger.error(e)
 
     def start(self):
         for event in self.bot.listen():
