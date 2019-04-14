@@ -317,9 +317,9 @@ class Bot:
         self.main_keyboard.add_line()
         add_button(self.main_keyboard, 'Забрать приз')
         self.main_keyboard.add_line()
-        add_button(self.main_keyboard, '!пополнить')
+        add_button(self.main_keyboard, 'Пополнить')
         add_button(self.main_keyboard, 'Баланс')
-        add_button(self.main_keyboard, '!вывести')
+        add_button(self.main_keyboard, 'Вывести')
 
     def send_message(self, id, message, keyboard=None):
         if not keyboard:
@@ -344,7 +344,8 @@ class Bot:
                     amount = Score.parse_score(message)
 
                     if game.in_progress and message == 'забрать приз':
-                        self.send_message(user_id, 'Типо выдал {}'.format(game.reward / 1000),)
+                        self.send_message(user_id, 'Вы забрали {}'.format(game.reward / 1000))
+                        score += game.reward
                         game.end_game()
                     elif not game.in_progress and message == 'забрать приз':
                         self.send_message(user_id, 'Ты ничего не выиграл')
@@ -352,20 +353,21 @@ class Bot:
                         if game.bet > score.get():
                             self.send_message(user_id, 'Бомж, у тебя нет {}'.format(game.bet / 1000))
                             game.end_game()
-                        elif game.play():
-                            self.send_message(user_id, 'Списал {}'.format(game.bet / 1000))
-                            self.send_message(user_id, 'Вы проиграли, выпал орел :(')
                         else:
-                            self.send_message(user_id, 'Опа, решка, поздравляю! Сыграем еще? Текущий приз: {}'.format(game.bet / 1000))
+                            score -= game.bet
+                            if game.play():
+                                self.send_message(user_id, 'Вы проиграли, выпал орел :(')
+                            else:
+                                self.send_message(user_id, 'Опа, решка, поздравляю! Сыграем еще? Текущий приз: {}'.format(game.bet / 1000))
                     elif message == 'баланс':
                         self.send_message(user_id, Messages.Score.format(score.print()))
-                    elif message.startswith('!пополнить'):
+                    elif message.startswith('пополнить'):
                         if amount:
                             self.send_message(user_id, Messages.Replenish.format(
                                 amount / 1000, coin_api.create_transaction_url(amount)))
                         else:
                             self.send_message(user_id, Messages.ReplenishError)
-                    elif message.startswith('!вывести'):
+                    elif message.startswith('вывести'):
                         if amount:
                             if amount > score.get():
                                 self.send_message(user_id, Messages.Bum)
@@ -376,8 +378,6 @@ class Bot:
                                 self.send_message(user_id, Messages.Send.format(amount / 1000))
                         else:
                             self.send_message(user_id, Messages.WithdrawError)
-                    elif message == 'вывести':
-                        self.send_message(user_id, Messages.Withdraw)
                     else:
                         self.send_message(user_id, Messages.Commands)
                 else:
