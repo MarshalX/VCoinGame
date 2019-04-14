@@ -68,7 +68,7 @@ class Transaction(Database):
         self.id = id
         self.from_id = from_id
         self.to_id = to_id
-        self.amount = int(int(amount) / 1000)
+        self.amount = int(amount)
         self.type = Transaction.Type(type)
         self.payload = payload
         self.external_id = external_id
@@ -136,7 +136,7 @@ class CoinAPI:
 
         params = self.params.copy()
         params.update({'toId': to_id})
-        params.update({'amount': amount * 1000})
+        params.update({'amount': amount})
 
         CoinAPI._send_request(method_url, json.dumps(params))
 
@@ -144,7 +144,7 @@ class CoinAPI:
         def to_hex(dec):
             return hex(int(dec)).split('x')[-1]
 
-        params = [to_hex(self.merchant_id), to_hex(amount * 1000), to_hex(random.randint(int(-2e9), int(2e9)))]
+        params = [to_hex(self.merchant_id), to_hex(amount), to_hex(random.randint(int(-2e9), int(2e9)))]
 
         return 'vk.com/coin#m' + '_'.join(params) + ('' if fixed else '_1')
 
@@ -211,6 +211,14 @@ class Score(Database):
 
         return result
 
+    def print(self):
+        return self.get() / 1000
+
+    @staticmethod
+    def parse_score(message):
+        finds = re.findall(r'\d*[.,]?\d+', message)
+        return int(float(finds[0].replace(',', '.')) * 1000) if len(finds) else None
+
 
 class Messages:
     Commands = """Da, net, mda"""
@@ -229,6 +237,71 @@ class Messages:
     Credited = """{} успешно зачислены на Ваш баланс!"""
 
 
+class Game(Database):
+    INITIAL_RATE = 10_000_000
+
+    def __init__(self, user_id):
+        super().__init__()
+
+        self.user_id = user_id
+        self.round = self.get_rounds()
+
+    @staticmethod
+    def random():
+        return random.randint(0, 1)
+
+    def play(self):
+        if not self.in_progress:
+            self.start_game()
+
+        if Game.random():
+            self.end_game()
+            return True
+        else:
+            self.__add__(1)
+            return False
+
+    def get_rounds(self):
+        cursor = self.connection.cursor()
+        cursor.execute("SELECT round FROM user_scores WHERE user_id = %s", (self.user_id,))
+        result = cursor.fetchone()[0]
+        cursor.close()
+
+        return result
+
+    def _update(self, sql_query, value):
+        cursor = self.connection.cursor()
+        cursor.execute(sql_query, (value, self.user_id))
+        self.connection.commit()
+        cursor.close()
+
+    def set_round(self, round):
+        self._update("UPDATE user_scores SET round = %s WHERE user_id = %s", round)
+        self.round = round
+
+    def __add__(self, value):
+        self._update("UPDATE user_scores SET round = round + %s WHERE user_id = %s", value)
+        self.round += value
+
+    def start_game(self):
+        self.set_round(0)
+
+    def end_game(self):
+        self.set_round(-1)
+
+    @property
+    def in_progress(self):
+        return self.round != -1
+
+    @property
+    def bet(self):
+        return Game.INITIAL_RATE * (2 ** (self.round - 1))
+
+    @property
+    def reward(self):
+        return Game.INITIAL_RATE * (2 ** self.round)
+
+
 class Bot:
     def __init__(self, group_id, group_token, coin_api):
         self.coin_api = coin_api
@@ -236,16 +309,21 @@ class Bot:
         self.bot = VkBotLongPoll(self.session, group_id)
         self.api = self.session.get_api()
 
+        def add_button(keyboard, text, color=VkKeyboardColor.DEFAULT, payload=''):
+            keyboard.add_button(text, color=color, payload=payload)
+
         self.main_keyboard = VkKeyboard(one_time=False)
 
-        def add_button(text, color=VkKeyboardColor.DEFAULT, payload=''):
-            self.main_keyboard.add_button(text, color=color, payload=payload)
-
-        add_button('Подкинуть монетку', color=VkKeyboardColor.POSITIVE)
+        add_button(self.main_keyboard, 'Подкинуть монетку', color=VkKeyboardColor.POSITIVE)
         self.main_keyboard.add_line()
-        add_button('!пополнить')
-        add_button('Баланс')
-        add_button('!вывести')
+        add_button(self.main_keyboard, '!пополнить')
+        add_button(self.main_keyboard, 'Баланс')
+        add_button(self.main_keyboard, '!вывести')
+
+        self.game_keyboard = VkKeyboard(one_time=True)
+        add_button(self.game_keyboard, 'Подкинуть ещё раз', color=VkKeyboardColor.POSITIVE)
+        self.game_keyboard.add_line()
+        add_button(self.game_keyboard, 'Забрать приз')
 
     def send_message(self, id, message, keyboard=None):
         if not keyboard:
@@ -263,30 +341,47 @@ class Bot:
             if event.type == VkBotEventType.MESSAGE_NEW:
                 user_id = event.object.from_id
                 score = Score(user_id)
+                game = Game(user_id)
 
                 if 'text' in event.object:
                     message = event.object.text.strip().lower()
-                    if message == 'баланс':
-                        self.send_message(user_id, Messages.Score.format(score.get()))
+                    amount = Score.parse_score(message)
+
+                    if game.in_progress:
+                        if message == 'подкинуть ещё раз':
+                            if game.play():
+                                self.send_message(user_id, 'Вы проиграли, выпал орел :(')
+                            else:
+                                self.send_message(user_id, 'Опа, решка, поздравляю! Сыграем еще?',
+                                                  keyboard=self.game_keyboard)
+                        elif message == 'забрать приз':
+                            game.end_game()
+                            self.send_message(user_id, 'Типо выдал {}'.format(game.reward / 1000),)
+                        else:
+                            self.send_message(user_id, 'Ты в игре!', keyboard=self.game_keyboard)
+
+                    elif message == 'подкинуть монетку':
+                        if game.play():
+                            self.send_message(user_id, 'Вы проиграли, выпал орел :(')
+                        else:
+                            self.send_message(user_id, 'Опа, решка, поздравляю! Сыграем еще?', keyboard=self.game_keyboard)
+                    elif message == 'баланс':
+                        self.send_message(user_id, Messages.Score.format(score.print()))
                     elif message.startswith('!пополнить'):
-                        finds = re.findall(r'\d+', message)
-                        if len(finds):
-                            amount = int(finds[0])
+                        if amount:
                             self.send_message(user_id, Messages.Replenish.format(
-                                amount, coin_api.create_transaction_url(amount)))
+                                amount / 1000, coin_api.create_transaction_url(amount)))
                         else:
                             self.send_message(user_id, Messages.ReplenishError)
                     elif message.startswith('!вывести'):
-                        finds = re.findall(r'\d+', message)
-                        if len(finds):
-                            amount = int(finds[0])
+                        if amount:
                             if amount > score.get():
                                 self.send_message(user_id, Messages.Bum)
                             else:
                                 score -= amount
                                 coin_api.send(user_id, amount)
 
-                                self.send_message(user_id, Messages.Send.format(amount))
+                                self.send_message(user_id, Messages.Send.format(amount / 1000))
                         else:
                             self.send_message(user_id, Messages.WithdrawError)
                     elif message == 'вывести':
