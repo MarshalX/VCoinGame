@@ -235,7 +235,7 @@ class Game(Database):
 
     @staticmethod
     def random():
-        return random.randint(0, 100) <= Game.WIN_RATE
+        return random.randint(0, 99) <= Game.WIN_RATE
 
     def play(self):
         self.__add__(1)
