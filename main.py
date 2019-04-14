@@ -294,8 +294,7 @@ class Game(Database):
 
     @property
     def bet(self):
-        print(self.round)
-        return Game.INITIAL_RATE * (2 ** self.round)
+        return Game.INITIAL_RATE if self.round == -1 else Game.INITIAL_RATE * (2 ** self.round)
 
     @property
     def reward(self):
@@ -316,14 +315,11 @@ class Bot:
 
         add_button(self.main_keyboard, 'Подкинуть монетку', color=VkKeyboardColor.POSITIVE)
         self.main_keyboard.add_line()
+        add_button(self.main_keyboard, 'Забрать приз')
+        self.main_keyboard.add_line()
         add_button(self.main_keyboard, '!пополнить')
         add_button(self.main_keyboard, 'Баланс')
         add_button(self.main_keyboard, '!вывести')
-
-        self.game_keyboard = VkKeyboard(one_time=True)
-        add_button(self.game_keyboard, 'Подкинуть ещё раз', color=VkKeyboardColor.POSITIVE)
-        self.game_keyboard.add_line()
-        add_button(self.game_keyboard, 'Забрать приз')
 
     def send_message(self, id, message, keyboard=None):
         if not keyboard:
@@ -347,26 +343,20 @@ class Bot:
                     message = event.object.text.strip().lower()
                     amount = Score.parse_score(message)
 
-                    if game.in_progress:
-                        if message == 'подкинуть ещё раз':
-                            self.send_message(user_id, 'Типо забрал {}'.format(game.bet / 1000))
-                            if game.play():
-                                self.send_message(user_id, 'Вы проиграли, выпал орел :(')
-                            else:
-                                self.send_message(user_id, 'Опа, решка, поздравляю! Сыграем еще?',
-                                                  keyboard=self.game_keyboard)
-                        elif message == 'забрать приз':
-                            self.send_message(user_id, 'Типо выдал {}'.format(game.reward / 1000),)
-                            game.end_game()
-                        else:
-                            self.send_message(user_id, 'Ты в игре!', keyboard=self.game_keyboard)
-
+                    if game.in_progress and message == 'забрать приз':
+                        self.send_message(user_id, 'Типо выдал {}'.format(game.reward / 1000),)
+                        game.end_game()
+                    elif not game.in_progress and message == 'забрать приз':
+                        self.send_message(user_id, 'Ты ничего не выиграл')
                     elif message == 'подкинуть монетку':
-                        self.send_message(user_id, 'Типо забрал {}'.format(game.bet / 1000))
-                        if game.play():
+                        if game.bet > score.get():
+                            self.send_message(user_id, 'Бомж, у тебя нет {}'.format(game.bet / 1000))
+                            game.end_game()
+                        elif game.play():
+                            self.send_message(user_id, 'Списал {}'.format(game.bet / 1000))
                             self.send_message(user_id, 'Вы проиграли, выпал орел :(')
                         else:
-                            self.send_message(user_id, 'Опа, решка, поздравляю! Сыграем еще?', keyboard=self.game_keyboard)
+                            self.send_message(user_id, 'Опа, решка, поздравляю! Сыграем еще? Текущий приз: {}'.format(game.bet / 1000))
                     elif message == 'баланс':
                         self.send_message(user_id, Messages.Score.format(score.print()))
                     elif message.startswith('!пополнить'):
@@ -415,7 +405,7 @@ if __name__ == '__main__':
                 transaction.save()
                 score = Score(transaction.from_id)
                 score += transaction.amount
-                bot.send_message(transaction.from_id, Messages.Credited.format(transaction.amount))
+                bot.send_message(transaction.from_id, Messages.Credited.format(transaction.amount / 1000))
 
     scheduler.start()
     bot.start()
