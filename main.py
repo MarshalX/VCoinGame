@@ -392,7 +392,7 @@ class Bot:
                                 logger.info(f'{user_id} выиграл {game.cur_reward / 1000}. '
                                             f'След. ставка {game.cur_reward / 1000}')
                                 self.send_message(user_id, Messages.Win.format(
-                                    game.cur_reward / 1000, game.cur_reward / 1000), attachment=self.win_img)
+                                    game.cur_reward / 1000, game.bet / 1000), attachment=self.win_img)
                     elif message == 'баланс':
                         logger.info(f'{user_id} посмотрел свой баланс')
                         self.send_message(user_id, Messages.Score.format(score.print()))
