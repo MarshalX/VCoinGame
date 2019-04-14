@@ -466,10 +466,10 @@ class Bot:
 
 
 if __name__ == '__main__':
-    group_id = os.environ.get('GROUP_ID')
+    group_id = int(os.environ.get('GROUP_ID'))
     group_token = os.environ.get('GROUP_TOKEN')
 
-    merchant_id = os.environ.get('MERCHANT_ID')
+    merchant_id = int(os.environ.get('MERCHANT_ID'))
     key = os.environ.get('KEY')
 
     coin_api = CoinAPI(merchant_id, key)
