@@ -312,6 +312,9 @@ class Messages:
 Часто задаваемые вопросы: vk.cc/9hAcg8
 
 ⚔️ Да прибудет с тобой удача, джедай..."""
+    ScoreReward = """💰 Ваш баланс: {}
+    
+Ваша приз: {} (нажмите "Забрать приз")"""
     Score = """💰 Ваш баланс: {}"""
     DepositFixed = """Пополнить счет на {} можно по следующей ссылке: {}"""
     Deposit = """Пополнить счет можно по следующей ссылке: {}"""
@@ -408,8 +411,11 @@ class Bot:
                         logger.info(f'{user_id} подкинул монетку')
                         if game.bet > score.get():
                             logger.info(f'У {user_id} не хватает средств для броска ({game.bet} > {score.get()})')
-                            
-                            self.send_message(user_id, Messages.BumLeft.format((game.bet - score.get()) / 1000))
+
+                            if not game.in_progress:
+                                self.send_message(user_id, Messages.BumLeft.format((game.bet - score.get()) / 1000))
+                            else:
+                                self.send_message(user_id, Messages.Reward.format((game.bet - score.get()) / 1000))
                         else:
                             score -= game.bet
                             if game.play():
@@ -422,7 +428,10 @@ class Bot:
                                     game.cur_reward / 1000, game.bet / 1000), attachment=self.win_img)
                     elif message == 'баланс':
                         logger.info(f'{user_id} посмотрел свой баланс')
-                        self.send_message(user_id, Messages.Score.format(score.print()))
+                        if game.in_progress:
+                            self.send_message(user_id, Messages.ScoreReward.format(score.print(), game.cur_reward / 1000))
+                        else:
+                            self.send_message(user_id, Messages.Score.format(score.print()))
                     elif message.startswith('пополнить'):
                         logger.info(f'{user_id} хочет пополнить баланс')
                         if amount:
@@ -436,6 +445,9 @@ class Bot:
                         if amount:
                             if amount > score.get():
                                 self.send_message(user_id, Messages.Bum)
+                                if game.in_progress:
+                                    self.send_message(user_id, Messages.ScoreReward.format(score.print(),
+                                                                                           game.cur_reward / 1000))
                             else:
                                 logger.info(f'{user_id} вывел {amount / 1000}')
                                 score -= amount
