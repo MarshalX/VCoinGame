@@ -28,7 +28,7 @@ console_handler = logging.StreamHandler()
 console_handler.setFormatter(logFormatter)
 
 logger.addHandler(console_handler)
-logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") is None else logging.INFO)
+logger.setLevel(logging.INFO if os.environ.get("DEBUG") is None else logging.DEBUG)
 
 
 class Database:
@@ -408,9 +408,12 @@ class Bot:
                         else:
                             self.send_message(user_id, Messages.WithdrawError)
                     else:
-                        self.send_message(user_id, Messages.Commands)
+                        self.send_message(user_id, Messages.Commands.format(Game.INITIAL_RATE / 1000))
                 else:
-                    self.send_message(user_id, Messages.Commands)
+                    self.send_message(user_id, Messages.Commands.format(Game.INITIAL_RATE / 1000))
+
+                score.connection.close()
+                game.connection.close()
 
 
 if __name__ == '__main__':
