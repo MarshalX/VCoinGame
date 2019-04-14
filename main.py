@@ -481,8 +481,11 @@ if __name__ == '__main__':
     @scheduler.scheduled_job(trigger='interval', seconds=5)
     def update_status():
         all_transactions = transaction_manager.get_all_ids()
+
         transactions = coin_api.get_transactions()
         transactions.extend(coin_api.get_transactions(False))
+        transactions = [transaction for transaction in transactions if transaction.from_id != merchant_id]
+
         for transaction in transactions:
             if transaction.id not in all_transactions:
                 logger.info(f'{transaction.from_id} пополнил баланс на {transaction.amount / 1000}')
