@@ -312,7 +312,9 @@ class Messages:
 Часто задаваемые вопросы: vk.cc/9hAcg8
 
 ⚔️ Да прибудет с тобой удача, джедай..."""
-    Score = """💰 Ваш баланс: {}"""
+    Score = """💰 Ваш баланс: {}
+    
+Текущий приз: {} (нажмите "Забрать приз")"""
     DepositFixed = """Пополнить счет на {} можно по следующей ссылке: {}"""
     Deposit = """Пополнить счет можно по следующей ссылке: {}"""
     WithdrawError = """Пожалуйста, используйте команду правильно!
@@ -326,9 +328,8 @@ class Messages:
     BumLeft = """😢 На Вашем баланс не хватает {} монет, чтобы сделать ставку!
     
 Вы можете пополнить его с помощью команды
-Пополнить <количество>
-
-Также ты можешь забрать свой текущий приз."""
+Пополнить <количество>"""
+    Reward = """Вы можете забрать свой приз! Нажмите "Забрать приз" """
     Send = """✅ {} монет было успешно выведено!"""
     Credited = """✅ {} монет успешно зачислены на Ваш баланс!"""
     PickUp = """💰 Вы забрали приз в размере {}"""
@@ -401,6 +402,8 @@ class Bot:
                             logger.info(f'У {user_id} не хватает средств для броска ({game.bet} > {score.get()})')
                             
                             self.send_message(user_id, Messages.BumLeft.format((game.bet - score.get()) / 1000))
+                            if game.cur_reward:
+                                self.send_message(user_id, Messages.Reward)
                         else:
                             score -= game.bet
                             if game.play():
@@ -413,7 +416,7 @@ class Bot:
                                     game.cur_reward / 1000, game.bet / 1000), attachment=self.win_img)
                     elif message == 'баланс':
                         logger.info(f'{user_id} посмотрел свой баланс')
-                        self.send_message(user_id, Messages.Score.format(score.print()))
+                        self.send_message(user_id, Messages.Score.format(score.print(), game.cur_reward / 1000))
                     elif message.startswith('пополнить'):
                         logger.info(f'{user_id} хочет пополнить баланс')
                         if amount:
@@ -427,6 +430,8 @@ class Bot:
                         if amount:
                             if amount > score.get():
                                 self.send_message(user_id, Messages.Bum)
+                                if game.cur_reward:
+                                    self.send_message(user_id, Messages.Reward)
                             else:
                                 logger.info(f'{user_id} вывел {amount / 1000}')
                                 score -= amount
@@ -460,8 +465,11 @@ if __name__ == '__main__':
     @scheduler.scheduled_job(trigger='interval', seconds=5)
     def update_status():
         all_transactions = transaction_manager.get_all_ids()
+
         transactions = coin_api.get_transactions()
         transactions.extend(coin_api.get_transactions(False))
+        transactions = [transaction for transaction in transactions if transaction.from_id != merchant_id]
+
         for transaction in transactions:
             if transaction.id not in all_transactions:
                 logger.info(f'{transaction.from_id} пополнил баланс на {transaction.amount / 1000}')
