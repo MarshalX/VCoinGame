@@ -506,7 +506,8 @@ if __name__ == '__main__':
 
         transactions = coin_api.get_transactions()
         transactions.extend(coin_api.get_transactions(False))
-        transactions = [transaction for transaction in transactions if transaction.from_id != merchant_id]
+        transactions = [transaction for transaction in transactions \
+                        if transaction.from_id != merchant_id and transaction.payload == CoinAPI.PAYLOAD]
 
         for transaction in transactions:
             if transaction.id not in all_transactions:
