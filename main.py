@@ -5,8 +5,10 @@ import random
 import logging
 import psycopg2
 import requests
+import threading
 
 from enum import Enum
+from queue import Queue
 from datetime import datetime
 
 from vk_api import vk_api
@@ -118,6 +120,8 @@ class CoinAPI:
     api_url = 'https://coin-without-bugs.vkforms.ru/merchant/{}/'
     headers = {'Content-Type': 'application/json'}
 
+    PAYLOAD = os.environ.get('PAYLOAD')
+
     def __init__(self, merchant_id, key):
         self.merchant_id = merchant_id
         self.key = key
@@ -153,7 +157,7 @@ class CoinAPI:
         def to_hex(dec):
             return hex(int(dec)).split('x')[-1]
 
-        params = [to_hex(self.merchant_id), to_hex(amount), to_hex(random.randint(int(-2e9), int(2e9)))]
+        params = [to_hex(self.merchant_id), to_hex(amount), to_hex(CoinAPI.PAYLOAD)]
 
         return 'vk.com/coin#m' + '_'.join(params) + ('' if fixed else '_1')
 
@@ -349,13 +353,14 @@ class Messages:
 
 
 class Bot:
-    def __init__(self, group_id, group_token, coin_api):
+    def __init__(self, group_id, group_token, coin_api, transfers):
         self.lose_img = os.environ.get('LOSE_IMG')
         self.win_img = os.environ.get('WIN_IMG')
 
         self.withdraw = []
 
         self.coin_api = coin_api
+        self.transfers = transfers
         self.session = vk_api.VkApi(token=group_token)
         self.bot = VkBotLongPoll(self.session, group_id)
         self.api = self.session.get_api()
@@ -395,90 +400,92 @@ class Bot:
         except ApiError as e:
             logger.error(e)
 
+    def message_handler(self, event):
+        user_id = event.object.from_id
+        score = Score(user_id)
+        game = Game(user_id)
+
+        def send_message(id, message, attachment=None):
+            self._send_message(id, message, attachment, game.in_progress)
+
+        if 'text' in event.object:
+            message = event.object.text.strip().lower()
+            amount = Score.parse_score(message)
+
+            if game.in_progress and message == 'забрать приз':
+                logger.info(f'{user_id} забрал приз в размере {game.cur_reward / 1000} коинов')
+
+                score += game.cur_reward
+                game.end_game()
+
+                send_message(user_id, Messages.PickUp.format(game.cur_reward / 1000))
+            elif not game.in_progress and message == 'забрать приз':
+                send_message(user_id, Messages.NoWin)
+            elif message == 'подкинуть монетку':
+                logger.info(f'{user_id} подкинул монетку')
+                if game.bet > score.get():
+                    logger.info(f'У {user_id} не хватает средств для броска ({game.bet} > {score.get()})')
+
+                    if not game.in_progress:
+                        send_message(user_id, Messages.BumLeft.format((game.bet - score.get()) / 1000))
+                    else:
+                        send_message(user_id, Messages.Reward.format((game.bet - score.get()) / 1000))
+                else:
+                    score -= game.bet
+                    if game.play():
+                        logger.info(f'{user_id} проиграл')
+                        send_message(user_id, Messages.Lose, attachment=self.lose_img)
+                    else:
+                        logger.info(f'{user_id} выиграл {game.cur_reward / 1000}. '
+                                    f'След. ставка {game.cur_reward / 1000}')
+                        send_message(user_id, Messages.Win.format(
+                            game.cur_reward / 1000, game.bet / 1000), attachment=self.win_img)
+            elif message == 'баланс':
+                logger.info(f'{user_id} посмотрел свой баланс')
+                if game.in_progress:
+                    send_message(user_id, Messages.ScoreReward.format(score.print(), game.cur_reward / 1000))
+                else:
+                    send_message(user_id, Messages.Score.format(score.print()))
+            elif message.startswith('пополнить'):
+                logger.info(f'{user_id} хочет пополнить баланс')
+                if amount:
+                    send_message(user_id, Messages.DepositFixed.format(
+                        amount / 1000, coin_api.create_transaction_url(amount)))
+                else:
+                    send_message(user_id, Messages.Deposit.format(
+                        coin_api.create_transaction_url(0, False)))
+            elif message == 'вывести' and user_id not in self.withdraw:
+                self.withdraw.append(user_id)
+                send_message(user_id, Messages.Withdraw)
+            elif user_id in self.withdraw:
+                logger.info(f'{user_id} хочет вывести баланс')
+                del self.withdraw[self.withdraw.index(user_id)]
+                if amount:
+                    if amount > score.get():
+                        if game.in_progress:
+                            send_message(user_id, Messages.Bum + Messages.ScoreReward.format(
+                                score.print(), game.cur_reward / 1000))
+                        else:
+                            send_message(user_id, Messages.Bum)
+                    else:
+                        logger.info(f'{user_id} вывел {amount / 1000}')
+                        score -= amount
+                        self.transfers.put((user_id, amount))
+                        send_message(user_id, Messages.Send.format(amount / 1000))
+                else:
+                    send_message(user_id, Messages.WithdrawError)
+            else:
+                send_message(user_id, Messages.Commands.format(Game.INITIAL_RATE / 1000))
+        else:
+            send_message(user_id, Messages.Commands.format(Game.INITIAL_RATE / 1000))
+
+        score.connection.close()
+        game.connection.close()
+
     def start(self):
         for event in self.bot.listen():
             if event.type == VkBotEventType.MESSAGE_NEW:
-                user_id = event.object.from_id
-                score = Score(user_id)
-                game = Game(user_id)
-
-                def send_message(id, message, attachment=None):
-                    self._send_message(id, message, attachment, game.in_progress)
-
-                if 'text' in event.object:
-                    message = event.object.text.strip().lower()
-                    amount = Score.parse_score(message)
-
-                    if game.in_progress and message == 'забрать приз':
-                        logger.info(f'{user_id} забрал приз в размере {game.cur_reward / 1000} коинов')
-
-                        score += game.cur_reward
-                        game.end_game()
-
-                        send_message(user_id, Messages.PickUp.format(game.cur_reward / 1000))
-                    elif not game.in_progress and message == 'забрать приз':
-                        send_message(user_id, Messages.NoWin)
-                    elif message == 'подкинуть монетку':
-                        logger.info(f'{user_id} подкинул монетку')
-                        if game.bet > score.get():
-                            logger.info(f'У {user_id} не хватает средств для броска ({game.bet} > {score.get()})')
-
-                            if not game.in_progress:
-                                send_message(user_id, Messages.BumLeft.format((game.bet - score.get()) / 1000))
-                            else:
-                                send_message(user_id, Messages.Reward.format((game.bet - score.get()) / 1000))
-                        else:
-                            score -= game.bet
-                            if game.play():
-                                logger.info(f'{user_id} проиграл')
-                                send_message(user_id, Messages.Lose, attachment=self.lose_img)
-                            else:
-                                logger.info(f'{user_id} выиграл {game.cur_reward / 1000}. '
-                                            f'След. ставка {game.cur_reward / 1000}')
-                                send_message(user_id, Messages.Win.format(
-                                    game.cur_reward / 1000, game.bet / 1000), attachment=self.win_img)
-                    elif message == 'баланс':
-                        logger.info(f'{user_id} посмотрел свой баланс')
-                        if game.in_progress:
-                            send_message(user_id, Messages.ScoreReward.format(score.print(), game.cur_reward / 1000))
-                        else:
-                            send_message(user_id, Messages.Score.format(score.print()))
-                    elif message.startswith('пополнить'):
-                        logger.info(f'{user_id} хочет пополнить баланс')
-                        if amount:
-                            send_message(user_id, Messages.DepositFixed.format(
-                                amount / 1000, coin_api.create_transaction_url(amount)))
-                        else:
-                            send_message(user_id, Messages.Deposit.format(
-                                coin_api.create_transaction_url(0, False)))
-                    elif message == 'вывести' and user_id not in self.withdraw:
-                        self.withdraw.append(user_id)
-                        send_message(user_id, Messages.Withdraw)
-                    elif user_id in self.withdraw:
-                        logger.info(f'{user_id} хочет вывести баланс')
-                        del self.withdraw[self.withdraw.index(user_id)]
-                        if amount:
-                            if amount > score.get():
-                                if game.in_progress:
-                                    send_message(user_id, Messages.Bum + Messages.ScoreReward.format(
-                                        score.print(), game.cur_reward / 1000))
-                                else:
-                                    send_message(user_id, Messages.Bum)
-                            else:
-                                logger.info(f'{user_id} вывел {amount / 1000}')
-                                score -= amount
-                                coin_api.send(user_id, amount)
-
-                                send_message(user_id, Messages.Send.format(amount / 1000))
-                        else:
-                            send_message(user_id, Messages.WithdrawError)
-                    else:
-                        send_message(user_id, Messages.Commands.format(Game.INITIAL_RATE / 1000))
-                else:
-                    send_message(user_id, Messages.Commands.format(Game.INITIAL_RATE / 1000))
-
-                score.connection.close()
-                game.connection.close()
+                threading.Thread(target=self.message_handler, args=(event,)).start()
 
 
 if __name__ == '__main__':
@@ -488,11 +495,18 @@ if __name__ == '__main__':
     merchant_id = int(os.environ.get('MERCHANT_ID'))
     key = os.environ.get('KEY')
 
+    transfers = Queue()
+
     coin_api = CoinAPI(merchant_id, key)
-    bot = Bot(group_id, group_token, coin_api)
+    bot = Bot(group_id, group_token, coin_api, transfers)
     transaction_manager = TransactionManager()
 
     scheduler = BackgroundScheduler(daemon=True)
+
+    def do_transfers(transfers_queue):
+        while True:
+            user_id, amount = transfers_queue.get()
+            coin_api.send(user_id, amount)
 
     @scheduler.scheduled_job(trigger='interval', seconds=5)
     def update_status():
@@ -513,5 +527,6 @@ if __name__ == '__main__':
 
                 bot._send_message(transaction.from_id, Messages.Credited.format(transaction.amount / 1000))
 
+    threading.Thread(target=do_transfers, args=(transfers,)).start()
     scheduler.start()
     bot.start()
