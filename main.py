@@ -401,11 +401,11 @@ class Bot:
                     amount = Score.parse_score(message)
 
                     if game.in_progress and message == 'забрать приз':
-                        logger.info(f'{user_id} забрал приз в размере {game.cur_reward / 1000} коинов, раунд: {game.round}, ставка: {game.bet / 1000}')
+                        logger.info(f'{user_id} забрал приз в размере {game.cur_reward / 1000} коинов')
                         score += game.cur_reward
-                        game.end_game()
-
                         send_message(user_id, Messages.PickUp.format(game.cur_reward / 1000))
+
+                        game.end_game()
                     elif not game.in_progress and message == 'забрать приз':
                         send_message(user_id, Messages.NoWin)
                     elif message == 'подкинуть монетку':
