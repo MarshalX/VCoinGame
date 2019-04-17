@@ -24,7 +24,6 @@ async def main():
     update_manager.register_handler(MessageHandler(ping, 'ping'))
 
     coin_api = CoinAPI(os.environ.get('MERCHANT_ID'), os.environ.get('KEY'), os.environ.get('PAYLOAD'))
-    coin_api.send(159179937, 1000)
 
     async def get_trans():
         while True:

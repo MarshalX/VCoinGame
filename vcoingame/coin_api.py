@@ -1,8 +1,8 @@
-import json
 import aiohttp
 import asyncio
 
 from enum import Enum
+
 
 class Transaction:
     class Type(Enum):
@@ -100,8 +100,8 @@ class CoinAPI:
 
     async def do_transfers(self):
         while True:
-            await self._send_request(await self.transfers.get())
+            await self._send_request(*await self.transfers.get())
 
     async def _send_request(self, url, params):
         async with self.session.post(url, json=params) as response:
-            return json.loads(await response.read())
+            return await response.json(content_type=response.content_type)
