@@ -15,7 +15,7 @@ async def ping(manager, update):
     await manager.api.messages.send(user_id=from_id, message='pong')
 
 
-if __name__ == '__main__':
+async def main():
     session = TokenSession(os.environ.get('GROUP_TOKEN'))
     api = API(session)
     lp = BotsLongPoll(api, mode=2, group_id=os.environ.get('GROUP_ID'))
@@ -28,13 +28,16 @@ if __name__ == '__main__':
 
     async def get_trans():
         while True:
-            print(await coin_api.get_transactions())
+            transactions = await coin_api.get_transactions()
+            for item in transactions:
+                print(item)
+            await asyncio.sleep(2)
 
-    loop = asyncio.get_event_loop()
-    task = loop.create_task(update_manager.start())
-    task2 = loop.create_task(coin_api.do_transfers())
-    task3 = loop.create_task(get_trans())
+    await asyncio.gather(
+        update_manager.start(),
+        coin_api.do_transfers(),
+        get_trans()
+    )
 
-    loop.run_until_complete(task)
-    loop.run_until_complete(task3)
-    loop.run_until_complete(task2)
+if __name__ == '__main__':
+    asyncio.run(main())

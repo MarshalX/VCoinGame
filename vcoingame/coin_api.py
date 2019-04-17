@@ -1,9 +1,8 @@
 import json
 import aiohttp
+import asyncio
 
 from enum import Enum
-from queue import Queue
-
 
 class Transaction:
     class Type(Enum):
@@ -59,7 +58,7 @@ class CoinAPI:
 
     def __init__(self, merchant_id, key, payload):
         self.session = aiohttp.ClientSession()
-        self.transfers = Queue()
+        self.transfers = asyncio.Queue()
         self.merchant_id = merchant_id
         self.payload = payload
         self.key = key
@@ -76,6 +75,7 @@ class CoinAPI:
         params.update({'tx': [1] if to_merchant else [2]})
 
         response = await self._send_request(method_url, params)
+        response = response['response']
 
         transactions = [Transaction.to_python(transaction) for transaction in response]
 
@@ -88,7 +88,7 @@ class CoinAPI:
         params.update({'toId': to_id})
         params.update({'amount': amount})
 
-        self.transfers.put((method_url, json.dumps(params)))
+        self.transfers.put_nowait((method_url, params))
 
     def create_transaction_url(self, amount, fixed=True):
         def to_hex(dec):
@@ -100,8 +100,8 @@ class CoinAPI:
 
     async def do_transfers(self):
         while True:
-            await self._send_request(*self.transfers.get())
+            await self._send_request(await self.transfers.get())
 
     async def _send_request(self, url, params):
         async with self.session.post(url, json=params) as response:
-            return await response.json()
+            return json.loads(await response.read())
