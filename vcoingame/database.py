@@ -26,3 +26,11 @@ class Database:
             return await stmt.fetchval(*args)
         finally:
             await self.pool.release(conn)
+
+    async def fetch(self, query, *args):
+        conn = await self.connection
+        try:
+            stmt = await conn.prepare(query)
+            return await stmt.fetch(*args)
+        finally:
+            await self.pool.release(conn)

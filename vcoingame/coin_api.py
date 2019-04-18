@@ -75,13 +75,13 @@ class CoinAPI:
         params.update({'tx': [1] if to_merchant else [2]})
 
         response = await self._send_request(method_url, params)
-        response = response['response']
+        response = response.get('response')
 
         transactions = [Transaction.to_python(transaction) for transaction in response]
 
         return transactions
 
-    def send(self, to_id, amount):
+    async def send(self, to_id, amount):
         method_url = CoinAPI.api_url.format(CoinAPI.Method.SEND.value)
 
         params = self.params.copy()

@@ -1,5 +1,7 @@
 from functools import partial
 
+from vk_api.exceptions import VkException
+
 
 class API:
     def __init__(self, session):
@@ -25,11 +27,14 @@ class Request:
     async def __call__(self, **method_args):
         timeout = method_args.pop('timeout', None)
         self._method_args = method_args
-        return await self._api._session.send_api_request(
-            self._method_name,
-            method_args,
-            timeout,
-        )
+        try:
+            return await self._api._session.send_api_request(
+                self._method_name,
+                method_args,
+                timeout,
+            )
+        except VkException as e:
+            print(e)
 
 
 class LazyAPI:

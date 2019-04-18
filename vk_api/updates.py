@@ -34,7 +34,7 @@ class UpdateManager:
             updates = await self.longpull.wait()
             for update in updates:
                 for handler in self._handlers:
-                    if update.type in handler.TYPES and handler.check(update.object):
+                    if update.type in handler.TYPES and await handler.check(update.object):
                         await handler.start(self, update)
                         if handler.final:
                             break

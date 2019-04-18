@@ -1,20 +1,27 @@
 from vcoingame.score import Score
+from vcoingame.game import Game
+from vcoingame.states import State
 
 
 class Session:
-    def __init__(self, database, user_id):
+    def __init__(self, database, user_id, state=State.MENU):
         self.user_id = user_id
         self.database = database
+        self.state = state
         self.game = self.score = None
         self._fields = {}
 
     async def initial(self):
         self.score = await Score.get_or_create(self.database, self.user_id)
+        self.game = await Game.create(self.database, self.user_id)
         return self
 
     @staticmethod
     async def create(database, user_id):
         return await Session(database, user_id).initial()
+
+    def reset_state(self):
+        self.state = State.ALL
 
     def __getitem__(self, item):
         return self._fields.get(item)
