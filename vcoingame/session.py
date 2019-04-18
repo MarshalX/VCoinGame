@@ -1,6 +1,10 @@
+import logging
+
 from vcoingame.score import Score
 from vcoingame.game import Game
 from vcoingame.states import State
+
+logger = logging.getLogger('vcoingame.session')
 
 
 class Session:
@@ -40,6 +44,7 @@ class SessionList:
 
     def append(self, user_id: int, item: Session):
         self._sessions.update({user_id: item})
+        logger.info(f'Appended session for {user_id}. Len: {self.__len__()}')
 
     def __len__(self):
         return len(self._sessions)

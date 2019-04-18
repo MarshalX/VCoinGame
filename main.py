@@ -1,22 +1,37 @@
 import os
 import asyncio
+import logging
 
-from vcoingame.transaction_manager import TransactionManager
 from vk_api.api import API
-from vk_api.keyboard import Keyboard, ButtonColor
+
 from vk_api.sessions import TokenSession
 from vk_api.longpull import BotsLongPoll
 from vk_api.updates import UpdateManager
 from vk_api.handlers import MessageHandler
+from vk_api.keyboard import Keyboard, ButtonColor
 
-from vcoingame.score import Score
-from vcoingame.database import Database
-from vcoingame.coin_api import CoinAPI
-from vcoingame.session import SessionList
-from vcoingame.messages import Message
-from vcoingame.handler_payload import HandlerPayload
-from vcoingame.states import State
 from vcoingame.game import Game
+from vcoingame.score import Score
+from vcoingame.states import State
+from vcoingame.coin_api import CoinAPI
+from vcoingame.messages import Message
+from vcoingame.database import Database
+from vcoingame.session import SessionList
+from vcoingame.handler_payload import HandlerPayload
+from vcoingame.transaction_manager import TransactionManager
+
+
+logFormatter = logging.Formatter(
+    '%(levelname)-5s [%(asctime)s] %(name)s %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger()
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logFormatter)
+
+logger.addHandler(console_handler)
+logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") else logging.INFO)
 
 
 async def help_handler(payload: HandlerPayload):

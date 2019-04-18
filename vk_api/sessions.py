@@ -1,7 +1,11 @@
+import logging
+
 from abc import ABC, abstractmethod
 
-from vk_api.exceptions import  VkCaptchaNeeded, VkAPIError, VkAuthError, CAPTCHA_IS_NEEDED, AUTHORIZATION_FAILED
+from vk_api.exceptions import VkCaptchaNeeded, VkAPIError, VkAuthError, CAPTCHA_IS_NEEDED, AUTHORIZATION_FAILED
 from vk_api.drivers import HttpDriver
+
+logger = logging.getLogger('vk_api.sessions')
 
 
 class BaseSession(ABC):
@@ -64,13 +68,16 @@ class TokenSession(BaseSession):
         params['v'] = self.API_VERSION
 
         # Send request
+        logger.debug(f'URL: {self.REQUEST_URL + method_name}; Params: {params}; Timeout: {timeout}')
         response = await self.driver.json(self.REQUEST_URL + method_name, params, timeout)
+        logger.debug(response)
 
         # Process response
         # Checking the section with errors
         error = response.get('error')
         if error:
             err_code = error.get('error_code')
+            logger.error(f'{error}; err_code: {err_code}')
             if err_code == CAPTCHA_IS_NEEDED:
                 # Collect information about Captcha
                 captcha_sid = error.get('captcha_sid')

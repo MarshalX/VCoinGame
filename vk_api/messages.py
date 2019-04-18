@@ -45,3 +45,5 @@ class Message:
             obj.get('is_hidden'),
         )
 
+    def __str__(self):
+        return f'[Message] From: {self.from_id} to: {self.peer_id}; text: {self.text}'

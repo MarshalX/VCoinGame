@@ -1,6 +1,10 @@
+import logging
+
 from enum import Enum
 
 from vk_api.messages import Message
+
+logger = logging.getLogger('vk_api.updates')
 
 
 class UpdateType(Enum):
@@ -22,6 +26,9 @@ class Update:
     def process_updates(response):
         return [Update(obj) for obj in response.get('updates')]
 
+    def __str__(self):
+        return f'[Update] Type: {self.type}; Object: {self.object}'
+
 
 class UpdateManager:
     def __init__(self, longpull):
@@ -35,6 +42,7 @@ class UpdateManager:
             for update in updates:
                 for handler in self._handlers:
                     if update.type in handler.TYPES and await handler.check(update.object):
+                        logger.info(f'Call ({handler}) for ({update})')
                         await handler.start(self, update)
                         if handler.final:
                             break

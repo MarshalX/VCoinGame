@@ -1,7 +1,10 @@
 import aiohttp
 import asyncio
+import logging
 
 from enum import Enum
+
+logger = logging.getLogger('vcoingame.coin_api')
 
 
 class Transaction:
@@ -76,6 +79,7 @@ class CoinAPI:
 
         response = await self._send_request(method_url, params)
         response = response.get('response')
+        logger.debug(response)
 
         transactions = [Transaction.to_python(transaction) for transaction in response]
 
@@ -104,4 +108,5 @@ class CoinAPI:
 
     async def _send_request(self, url, params):
         async with self.session.post(url, json=params) as response:
+            logger.debug(response)
             return await response.json(content_type=response.content_type)

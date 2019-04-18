@@ -50,3 +50,6 @@ class MessageHandler:
             self.payload.session.reset_state()
 
         await self.target(self.payload)
+
+    def __str__(self):
+        return f'[MessageHandler] Pattern: {self.pattern}'

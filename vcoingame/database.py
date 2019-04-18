@@ -1,6 +1,8 @@
 import os
-
+import logging
 import asyncpg
+
+logger = logging.getLogger('vcoingame.database')
 
 
 class Database:
@@ -20,6 +22,7 @@ class Database:
         return await self.pool.acquire()
 
     async def fetchval(self, query, *args):
+        logger.debug(f'{query}; {args}')
         conn = await self.connection
         try:
             stmt = await conn.prepare(query)
@@ -28,6 +31,7 @@ class Database:
             await self.pool.release(conn)
 
     async def fetch(self, query, *args):
+        logger.debug(f'{query}; {args}')
         conn = await self.connection
         try:
             stmt = await conn.prepare(query)

@@ -33,8 +33,8 @@ class Request:
                 method_args,
                 timeout,
             )
-        except VkException as e:
-            print(e)
+        except VkException:
+            pass
 
 
 class LazyAPI:
