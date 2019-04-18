@@ -1,7 +1,3 @@
 multidict
-vk_api
 aiovk
-requests
-apscheduler
-psycopg2-binary
 asyncpg
