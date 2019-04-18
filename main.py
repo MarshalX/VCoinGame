@@ -200,7 +200,7 @@ async def main():
     update_manager.register_handler(MessageHandler(
         balance_handler, 'Баланс', State.ALL, payload, reset_state=True))
     update_manager.register_handler(MessageHandler(
-        help_handler, '', State.ALL, payload))
+        help_handler, '', State.ALL, payload, reset_state=True))
 
     async def get_trans():
         while True:
