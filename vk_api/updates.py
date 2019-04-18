@@ -6,6 +6,9 @@ from vk_api.messages import Message
 class UpdateType(Enum):
     MESSAGE_NEW = 'message_new'
     MESSAGE_REPLY = 'message_reply'
+    MESSAGE_ALLOW = 'message_allow'
+    MESSAGE_EDIT = 'message_edit'
+    MESSAGE_DENY = 'message_deny'
 
 
 class Update:

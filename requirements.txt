@@ -4,3 +4,4 @@ aiovk
 requests
 apscheduler
 psycopg2-binary
+asyncpg
