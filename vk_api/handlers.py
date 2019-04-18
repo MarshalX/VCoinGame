@@ -52,4 +52,4 @@ class MessageHandler:
         await self.target(self.payload)
 
     def __str__(self):
-        return f'[MessageHandler] Pattern: {self.pattern}'
+        return f'[MessageHandler] Pattern: {self.pattern}; State: {self.state}'
