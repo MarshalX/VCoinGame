@@ -1,8 +1,16 @@
-class HandlerPayload:
-    def __init__(self, sessions, coin_api, keyboards):
-        self.manager = self.update = self.api = None
-        self.from_id = self.text = self.regex_result = self.session = self.keyboard = None
+from vk_api.updates import UpdateManager
 
-        self.sessions = sessions
-        self.coin_api = coin_api
-        self.keyboards = keyboards
+from vcoingame.coin_api import CoinAPI
+from vcoingame.session import SessionList
+
+
+class HandlerContext:
+    api = update_manager = sessions = coin_api = keyboards = None
+
+    @staticmethod
+    def initial(update_manager: UpdateManager, sessions: SessionList, coin_api: CoinAPI, keyboards: dict):
+        HandlerContext.update_manager = update_manager
+        HandlerContext.api = update_manager.api
+        HandlerContext.sessions = sessions
+        HandlerContext.coin_api = coin_api
+        HandlerContext.keyboards = keyboards

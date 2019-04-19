@@ -42,10 +42,8 @@ class UpdateManager:
             for update in updates:
                 for handler in self._handlers:
                     if update.type in handler.TYPES and await handler.check(update.object):
-                        session = await handler.payload.sessions.get_or_create(handler.payload.from_id)
-                        logger.info(f'[HandlerCheck] {handler.state}; User state: {session.state}')
                         logger.info(f'[HandlerCall] ({handler}) for ({update})')
-                        await handler.start(self, update)
+                        await handler.start(update)
                         if handler.final:
                             break
 

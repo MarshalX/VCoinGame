@@ -1,55 +1,52 @@
 import re
 
-from vk_api.updates import UpdateType
+from vk_api.updates import UpdateType, Update
 
-from vcoingame.handler_payload import HandlerPayload
+from vcoingame.handler_payload import HandlerContext
 from vcoingame.states import State
 
 
 class MessageHandler:
+
     TYPES = [UpdateType.MESSAGE_NEW]
 
-    def __init__(self, target, pattern, state: State or list,
-                 payload: HandlerPayload, reset_state=False, regex=False, final=True):
+    def __init__(self, target, pattern, state: State or list = State.ALL,
+                 reset_state=True, regex=False, final=True):
         self.target = target
         self.regex = regex
         self.regex_result = None
         self.final = final
         self.pattern = pattern
         self.state = state if isinstance(state, list) else [state]
-        self.payload = payload
         self.reset_state = reset_state
 
     async def check(self, message):
-        session = await self.payload.sessions.get_or_create(self.payload.from_id)
+        session = await HandlerContext.sessions.get_or_create(message.from_id)
         if State.ALL not in self.state and session.state not in self.state:
             return False
 
         if self.regex:
             self.regex_result = re.findall(self.pattern, message.text)
-            return True if len(self.regex_result) else False
+            return len(self.regex_result) > 0
         else:
             return self.pattern in message.text
 
-    async def start(self, manager, update):
-        self.payload.api = manager.api
-        self.payload.update = update
-        self.payload.regex_result = self.regex_result
-
+    async def start(self, update: Update):
         message = update.object
-        self.payload.from_id = message.from_id
-        self.payload.text = message.text
+        session = await HandlerContext.sessions.get_or_create(message.from_id)
 
-        self.payload.session = await self.payload.sessions.get_or_create(message.from_id)
+        session['update'] = update
+        session['regex_result'] = self.regex_result
+        session['message'] = message
 
-        main = self.payload.keyboards.get('main')
-        game = self.payload.keyboards.get('game')
-        self.payload.keyboard = game if self.payload.session.state == State.GAME else main
+        main = HandlerContext.keyboards.get('main')
+        game = HandlerContext.keyboards.get('game')
+        session['keyboard'] = game if session.state == State.GAME else main
 
         if self.reset_state:
-            self.payload.session.reset_state()
+            session.reset_state()
 
-        await self.target(self.payload)
+        await self.target(session)
 
     def __str__(self):
         return f'[MessageHandler] Pattern: {self.pattern}; State: {self.state}'
