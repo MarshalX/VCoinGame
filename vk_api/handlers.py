@@ -29,7 +29,7 @@ class MessageHandler:
             self.regex_result = re.findall(self.pattern, message.text)
             return len(self.regex_result) > 0
         else:
-            return self.pattern in message.text
+            return self.pattern == message.text
 
     async def start(self, update: Update):
         message = update.object
@@ -38,10 +38,6 @@ class MessageHandler:
         session['update'] = update
         session['regex_result'] = self.regex_result
         session['message'] = message
-
-        main = HandlerContext.keyboards.get('main')
-        game = HandlerContext.keyboards.get('game')
-        session['keyboard'] = game if session.state == State.GAME else main
 
         if self.reset_state:
             session.reset_state()

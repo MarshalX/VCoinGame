@@ -1,8 +1,8 @@
 import logging
 
 from vcoingame.score import Score
-from vcoingame.game import Game
 from vcoingame.states import State
+from vcoingame.statistics import Statistics
 
 logger = logging.getLogger('vcoingame.session')
 
@@ -12,12 +12,13 @@ class Session:
         self.user_id = user_id
         self.database = database
         self.state = state
-        self.game = self.score = None
+        self.statistics = self.score = None
         self._fields = {}
 
     async def initial(self):
         self.score = await Score.get_or_create(self.database, self.user_id)
-        self.game = await Game.create(self.database, self.user_id)
+        self.statistics = Statistics(self.database, self.user_id)
+
         return self
 
     @staticmethod

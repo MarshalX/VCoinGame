@@ -16,11 +16,15 @@ class UpdateType(Enum):
 
 
 class Update:
-    def __init__(self, update):
-        self.type = UpdateType(update.get('type'))
+    def __init__(self, update=None, type: UpdateType = None, object=None):
+        if update:
+            self.type = UpdateType(update.get('type'))
 
-        if self.type is UpdateType.MESSAGE_NEW:
-            self.object = Message.to_python(update.get('object'))
+            if self.type is UpdateType.MESSAGE_NEW:
+                self.object = Message.to_python(update.get('object'))
+        else:
+            self.type = type
+            self.object = object
 
     @staticmethod
     def process_updates(response):
@@ -36,16 +40,36 @@ class UpdateManager:
         self.api = self.longpull.api
         self._handlers = []
 
+    async def process_unread_conversation(self):
+        updates = []
+
+        offset = 0
+        while True:
+            response = await self.api.messages.getConversations(filter='unanswered', offset=offset, count=200)
+
+            for conversation in response.get('items'):
+                updates.append(Update(type=UpdateType.MESSAGE_NEW, object=Message.to_python(conversation.get('last_message'))))
+
+            if response.get('count') <= offset + 200:
+                break
+            else:
+                offset += 200
+
+        await self._process_updates(updates)
+
+    async def _process_updates(self, updates):
+        for update in updates:
+            for handler in self._handlers:
+                if update.type in handler.TYPES and await handler.check(update.object):
+                    logger.debug(f'[HandlerCall] ({handler}) for ({update})')
+                    await handler.start(update)
+                    if handler.final:
+                        break
+
     async def start(self):
         while True:
             updates = await self.longpull.wait()
-            for update in updates:
-                for handler in self._handlers:
-                    if update.type in handler.TYPES and await handler.check(update.object):
-                        logger.info(f'[HandlerCall] ({handler}) for ({update})')
-                        await handler.start(update)
-                        if handler.final:
-                            break
+            await self._process_updates(updates)
 
     def register_handler(self, handler):
         self._handlers.append(handler)

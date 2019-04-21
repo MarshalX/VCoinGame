@@ -7,3 +7,4 @@ class State(Enum):
     MENU = 0
     GAME = 1
     WITHDRAW = 3
+    BET = 4
