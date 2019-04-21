@@ -105,10 +105,8 @@ class CoinAPI:
     async def do_transfers(self):
         while True:
             response = await self._send_request(*await self.transfers.get())
-            if response.get('error'):
-                logger.error(f'Can`t send coins! Response: {response}')
+            logger.warning(f'Sending coins! Response: {response}')
 
     async def _send_request(self, url, params):
         async with self.session.post(url, json=params) as response:
-            logger.debug(response)
             return await response.json(content_type=response.content_type)
