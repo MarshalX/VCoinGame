@@ -130,7 +130,7 @@ async def game_handler(session: Session):
     user_choice_img = 'HEADS_IMG' if session['message'].text == 'Орёл' else 'TAILS_IMG'
 
     if random.randint(0, 100) < int(os.environ.get('WIN_RATE')):
-        msg = Message.Win.format(session['bet'] * 2)
+        msg = Message.Win.format(session['bet'] * 2 / 1000)
         img = os.environ.get(user_choice_img)
 
         await session.statistics.add_win()
