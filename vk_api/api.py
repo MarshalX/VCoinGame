@@ -1,6 +1,7 @@
 from functools import partial
 
 from vk_api.exceptions import VkException
+from vk_api.execute import Function
 
 
 class API:
@@ -22,6 +23,8 @@ class Request:
         self._method_name = method_name
 
     def __getattr__(self, method_name):
+        if method_name == 'code':
+            return Function(self)
         return Request(self._api, self._method_name + '.' + method_name)
 
     async def __call__(self, **method_args):
