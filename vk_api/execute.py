@@ -9,22 +9,25 @@ class Pool:
     def __init__(self, api):
         self.api = api
         self.execute = self.api.execute._method_name
-        self._pool = []
+        self._pool = asyncio.Queue()
 
     async def compile(self):
-        methods = self._pool[0:25]
+        methods = []
+        for _ in range(0, 25):
+            if self._pool.empty():
+                break
+
+            methods.append(self._pool.get_nowait())
+
         methods = ','.join(methods)
-
-        del self._pool[0:25]
-
         return f'return [{methods}];'
 
     def append(self, request):
-        self._pool.append(request)
+        self._pool.put_nowait(request)
 
     async def start(self):
         while True:
-            if len(self._pool) > 0:
+            if not self._pool.empty():
                 await self.api._session.send_api_request(self.execute, {'code': await self.compile()})
             await asyncio.sleep(0.55)
 
