@@ -49,7 +49,7 @@ async def balance_handler(session: Session):
 
 
 async def withdraw_handler_1(session: Session):
-    session.state = State.WITHDRAW
+    await session.set_state(State.WITHDRAW)
 
     HandlerContext.pool.append(HandlerContext.api.messages.send.code(
         user_id=session.user_id, message=Message.Withdraw, keyboard=HandlerContext.keyboards.get('main').get_keyboard()))
@@ -79,7 +79,7 @@ async def deposit_handler(session: Session):
 
 
 async def toss_handler_1(session: Session):
-    session.state = State.BET
+    await session.set_state(State.BET)
 
     HandlerContext.pool.append(HandlerContext.api.messages.send.code(
         user_id=session.user_id, message=Message.Bet, keyboard=HandlerContext.keyboards.get('bet').get_keyboard()))
@@ -87,26 +87,26 @@ async def toss_handler_1(session: Session):
 
 async def toss_handler_2(session: Session):
     amount = Score.parse_score(session['message'].text)
-    session['bet'] = amount
+    await session.set_bet(amount)
     user_score = session.score.score
     max_bet = int(os.environ.get('MAX_BET'))
 
     if amount > max_bet:
-        session.state = State.BET
+        await session.set_state(State.BET)
 
         msg = Message.OverMaxBet.format(max_bet / 1000)
         kbr = 'bet'
     elif amount > user_score:
-        session.state = State.ALL
+        await session.set_state(State.ALL)
 
         msg = Message.BumLeft.format((amount - user_score) / 1000)
         kbr = 'main'
     else:
-        session.state = State.GAME
+        await session.set_state(State.GAME)
 
         await session.statistics.add_bet(amount)
 
-        await session.score.sub(session['bet'])
+        await session.score.sub(session.bet)
 
         msg = Message.BetMade.format(amount * 2 / 1000)
         kbr = 'game'
@@ -120,7 +120,7 @@ async def toss_handler_2(session: Session):
 async def im_game_handler(session: Session):
     HandlerContext.pool.append(HandlerContext.api.messages.send.code(
             user_id=session.user_id,
-            message=Message.MakeAChoice.format(session['bet'] * 2 / 1000),
+            message=Message.MakeAChoice.format(session.bet * 2 / 1000),
             keyboard=HandlerContext.keyboards.get('game').get_keyboard()))
 
 
@@ -130,13 +130,13 @@ async def game_handler(session: Session):
     user_choice_img = 'HEADS_IMG' if session['message'].text == 'Орёл' else 'TAILS_IMG'
 
     if random.randint(0, 100) < int(os.environ.get('WIN_RATE')):
-        msg = Message.Win.format(session['bet'] * 2 / 1000)
+        msg = Message.Win.format(session.bet * 2 / 1000)
         img = os.environ.get(user_choice_img)
 
         await session.statistics.add_win()
-        await session.statistics.add_prize(session['bet'] * 2)
+        await session.statistics.add_prize(session.bet * 2)
 
-        await session.score.add(session['bet'] * 2)
+        await session.score.add(session.bet * 2)
     else:
         msg = Message.Lose.format(not_user_choice_msg)
         img = os.environ.get(not_user_choice_img)

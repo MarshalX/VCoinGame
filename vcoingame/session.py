@@ -12,11 +12,14 @@ class Session:
         self.user_id = user_id
         self.database = database
         self.state = state
+        self.bet = 0
         self.statistics = self.score = None
         self._fields = {}
 
     async def initial(self):
         self.score = await Score.get_or_create(self.database, self.user_id)
+        self.state = await self.get_state()
+        self.bet = await self.get_bet()
         self.statistics = Statistics(self.database, self.user_id)
 
         return self
@@ -25,8 +28,32 @@ class Session:
     async def create(database, user_id):
         return await Session(database, user_id).initial()
 
-    def reset_state(self):
-        self.state = State.ALL
+    async def get_bet(self):
+        logger.info(f'Get {self.user_id}`s current bet')
+        self.bet = await self.database.fetchval(
+            '''SELECT current_bet FROM user_scores WHERE user_id = ($1::int)''', self.user_id)
+        return self.bet
+
+    async def set_bet(self, bet):
+        logger.info(f'Set current bet for {self.user_id}')
+        await self.database.fetchval(
+            '''UPDATE user_scores SET current_bet = ($1::bigint) WHERE user_id = ($2::int)''', bet, self.user_id)
+        self.bet = bet
+
+    async def get_state(self):
+        logger.info(f'Get {self.user_id}`s state')
+        self.state = State(await self.database.fetchval(
+            '''SELECT state FROM user_scores WHERE user_id = ($1::int)''', self.user_id))
+        return self.state
+
+    async def set_state(self, state: State):
+        logger.info(f'Set state for {self.user_id}')
+        await self.database.fetchval(
+            '''UPDATE user_scores SET state = ($1::smallint) WHERE user_id = ($2::int)''', state.value, self.user_id)
+        self.state = state
+
+    async def reset_state(self):
+        await self.set_state(State.ALL)
 
     def __getitem__(self, item):
         return self._fields.get(item)
@@ -45,7 +72,7 @@ class SessionList:
 
     def append(self, user_id: int, item: Session):
         self._sessions.update({user_id: item})
-        logger.info(f'Appended session for {user_id}. Len: {self.__len__()}')
+        logger.info(f'Appended session for {user_id}. Len: {len(self)}')
 
     def __len__(self):
         return len(self._sessions)

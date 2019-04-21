@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from enum import Enum
@@ -69,7 +70,7 @@ class UpdateManager:
     async def start(self):
         while True:
             updates = await self.longpull.wait()
-            await self._process_updates(updates)
+            asyncio.get_event_loop().create_task(self._process_updates(updates))
 
     def register_handler(self, handler):
         self._handlers.append(handler)

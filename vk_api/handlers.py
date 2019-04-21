@@ -40,7 +40,7 @@ class MessageHandler:
         session['message'] = message
 
         if self.reset_state:
-            session.reset_state()
+            await session.reset_state()
 
         await self.target(session)
 
