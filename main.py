@@ -225,7 +225,7 @@ async def main():
     update_manager.register_handler(MessageHandler(
         help_handler, ''))
 
-    await update_manager.process_unread_conversation()
+    asyncio.get_event_loop().create_task(update_manager.process_unread_conversation())
 
     async def get_trans():
         while True:
