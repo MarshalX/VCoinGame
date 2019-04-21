@@ -29,7 +29,7 @@ class MessageHandler:
             self.regex_result = re.findall(self.pattern, message.text)
             return len(self.regex_result) > 0
         else:
-            return self.pattern == message.text
+            return self.pattern in message.text
 
     async def start(self, update: Update):
         message = update.object
