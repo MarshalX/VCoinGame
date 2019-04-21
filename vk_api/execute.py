@@ -1,6 +1,9 @@
 import six
 import json
 import asyncio
+import logging
+
+logger = logging.getLogger('vk_api.execute')
 
 
 class Pool:
@@ -19,6 +22,7 @@ class Pool:
 
             methods.append(self._pool.get_nowait())
 
+        logger.info(f'Pool queue size: {self._pool.qsize()}; Current methods in request: {len(methods)}')
         methods = ','.join(methods)
         return f'return [{methods}];'
 
