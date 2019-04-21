@@ -28,7 +28,7 @@ class Update:
             self.object = object
 
     @staticmethod
-    def process_updates(response):
+    async def process_updates(response):
         return [Update(obj) for obj in response.get('updates')]
 
     def __str__(self):
@@ -36,9 +36,9 @@ class Update:
 
 
 class UpdateManager:
-    def __init__(self, longpull):
-        self.longpull = longpull
-        self.api = self.longpull.api
+    def __init__(self, longpoll):
+        self.longpoll = longpoll
+        self.api = self.longpoll.api
         self._handlers = []
 
     async def process_unread_conversation(self):
@@ -69,8 +69,8 @@ class UpdateManager:
 
     async def start(self):
         while True:
-            updates = await self.longpull.wait()
-            asyncio.get_event_loop().create_task(self._process_updates(updates))
+            updates = await self.longpoll.wait()
+            asyncio.create_task(self._process_updates(updates))
 
     def register_handler(self, handler):
         self._handlers.append(handler)

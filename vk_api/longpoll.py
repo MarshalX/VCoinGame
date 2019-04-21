@@ -1,8 +1,9 @@
 import json
+
 from abc import ABC, abstractmethod
 
 from vk_api.updates import Update
-from vk_api.api import API, LazyAPI
+from vk_api.api import API
 from vk_api.exceptions import VkLongPollError
 
 
@@ -18,7 +19,7 @@ class BaseLongPoll(ABC):
         :param version: protocol version
         :param timeout: timeout for *.getLongPollServer request in current session
         """
-        if isinstance(session_or_api, (API, LazyAPI)):
+        if isinstance(session_or_api, API):
             self.api = session_or_api
         else:
             self.api = API(session_or_api)
@@ -62,7 +63,7 @@ class BaseLongPoll(ABC):
         # invalid mimetype from server
         code, response = await self.api._session.driver.get_text(
             self.base_url, params,
-            timeout=2 * self.base_params['wait']
+            timeout=self.base_params['wait']
         )
 
         if code == 403:
@@ -73,7 +74,7 @@ class BaseLongPoll(ABC):
 
         if not failed:
             self.ts = response['ts']
-            return Update.process_updates(response)
+            return await Update.process_updates(response)
 
         if failed == 1:
             self.ts = response['ts']

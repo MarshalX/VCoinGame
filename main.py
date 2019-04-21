@@ -2,11 +2,13 @@ import os
 import random
 import asyncio
 import logging
+import aiohttp
 
 from vk_api.api import API
+from vk_api.drivers import HttpDriver
 from vk_api.execute import Pool
 from vk_api.sessions import TokenSession
-from vk_api.longpull import BotsLongPoll
+from vk_api.longpoll import BotsLongPoll
 from vk_api.updates import UpdateManager
 from vk_api.handlers import MessageHandler
 from vk_api.keyboard import Keyboard, ButtonColor
@@ -152,10 +154,12 @@ async def game_handler(session: Session):
 
 
 async def main():
-    token_session = TokenSession(os.environ.get('GROUP_TOKEN'))
+    token_session = TokenSession(
+        access_token=os.environ.get('GROUP_TOKEN'),
+        driver=HttpDriver(timeout=10, session=aiohttp.ClientSession()))
     api = API(token_session)
     pool = Pool(api)
-    longpull = BotsLongPoll(api, mode=2, group_id=os.environ.get('GROUP_ID'))
+    longpoll = BotsLongPoll(api, mode=2, group_id=os.environ.get('GROUP_ID'))
 
     coin_api = CoinAPI(os.environ.get('MERCHANT_ID'), os.environ.get('KEY'), os.environ.get('PAYLOAD'))
 
@@ -194,7 +198,7 @@ async def main():
         'bet': bet_keyboard
     }
 
-    update_manager = UpdateManager(longpull)
+    update_manager = UpdateManager(longpoll)
 
     HandlerContext.initial(pool, update_manager, sessions, coin_api, keyboards)
 
@@ -225,7 +229,7 @@ async def main():
     update_manager.register_handler(MessageHandler(
         help_handler, ''))
 
-    asyncio.get_event_loop().create_task(update_manager.process_unread_conversation())
+    asyncio.create_task(update_manager.process_unread_conversation())
 
     async def get_trans():
         while True:

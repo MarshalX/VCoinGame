@@ -32,8 +32,7 @@ class Pool:
     async def start(self):
         while True:
             if not self._pool.empty():
-                asyncio.get_event_loop().create_task(
-                    self.api._session.send_api_request(self.execute, {'code': await self.compile()}))
+                asyncio.create_task(self.api._session.send_api_request(self.execute, {'code': await self.compile()}))
             await asyncio.sleep(0.55)
 
 
