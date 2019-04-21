@@ -1,3 +1,4 @@
 multidict
 aiovk
 asyncpg
+six
