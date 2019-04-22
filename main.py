@@ -10,8 +10,8 @@ from vk_api.execute import Pool
 from vk_api.sessions import TokenSession
 from vk_api.longpoll import BotsLongPoll
 from vk_api.updates import UpdateManager
-from vk_api.handlers import MessageHandler
 from vk_api.keyboard import Keyboard, ButtonColor
+from vk_api.handlers import MessageHandler, GroupJoinHandler, GroupLeaveHandler
 
 from vcoingame.score import Score
 from vcoingame.states import State
@@ -34,6 +34,12 @@ console_handler.setFormatter(logFormatter)
 
 logger.addHandler(console_handler)
 logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") else logging.INFO)
+
+
+async def not_group_member_handler(session: Session):
+    if session.user_id not in HandlerContext.group_members:
+        HandlerContext.pool.append(
+            HandlerContext.api.messages.send.code(user_id=session.user_id, message=Message.NotGroupMember))
 
 
 async def help_handler(session: Session):
@@ -155,6 +161,23 @@ async def game_handler(session: Session):
     ))
 
 
+async def get_members(api):
+    members = []
+
+    offset = 0
+    while True:
+        response = await api.groups.getMembers(group_id=os.environ.get('GROUP_ID'), offset=offset, count=1000)
+
+        members.extend([members for members in response.get('items')])
+
+        if response.get('count') <= offset + 1000:
+            break
+        else:
+            offset += 1000
+
+    return members
+
+
 async def main():
     token_session = TokenSession(
         access_token=os.environ.get('GROUP_TOKEN'),
@@ -202,7 +225,13 @@ async def main():
 
     update_manager = UpdateManager(longpoll)
 
-    HandlerContext.initial(pool, update_manager, sessions, coin_api, keyboards)
+    HandlerContext.initial(await get_members(api), pool, update_manager, sessions, coin_api, keyboards)
+
+    update_manager.register_handler(GroupJoinHandler())
+    update_manager.register_handler(GroupLeaveHandler())
+
+    update_manager.register_handler(MessageHandler(
+        not_group_member_handler, '', final=False, reset_state=False))
 
     update_manager.register_handler(MessageHandler(
         game_handler, 'Орёл', State.GAME))

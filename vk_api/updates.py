@@ -15,6 +15,9 @@ class UpdateType(Enum):
     MESSAGE_EDIT = 'message_edit'
     MESSAGE_DENY = 'message_deny'
 
+    GROUP_JOIN = 'group_join'
+    GROUP_LEAVE = 'group_leave'
+
 
 class Update:
     def __init__(self, update=None, type: UpdateType = None, object=None):
@@ -23,6 +26,8 @@ class Update:
 
             if self.type is UpdateType.MESSAGE_NEW:
                 self.object = Message.to_python(update.get('object'))
+            elif self.type in [UpdateType.GROUP_LEAVE, UpdateType.GROUP_JOIN]:
+                self.object = update.get('object')
         else:
             self.type = type
             self.object = object

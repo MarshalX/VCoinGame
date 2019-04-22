@@ -1,4 +1,5 @@
 import re
+import logging
 
 from vk_api.updates import UpdateType, Update
 
@@ -6,8 +7,37 @@ from vcoingame.handler_payload import HandlerContext
 from vcoingame.states import State
 
 
-class MessageHandler:
+logger = logging.getLogger('vcoingame.handlers')
 
+
+class GroupHandler:
+    final = False
+
+    async def check(self, object):
+        return True
+
+
+class GroupJoinHandler(GroupHandler):
+    TYPES = [UpdateType.GROUP_JOIN]
+
+    async def start(self, update: Update):
+        user_id = update.object.get('user_id')
+        if user_id not in HandlerContext.group_members:
+            HandlerContext.group_members.append(user_id)
+            logger.info(f'{user_id} join to group')
+
+
+class GroupLeaveHandler(GroupHandler):
+    TYPES = [UpdateType.GROUP_LEAVE]
+
+    async def start(self, update: Update):
+        user_id = update.object.get('user_id')
+        if user_id in HandlerContext.group_members:
+            del HandlerContext.group_members[HandlerContext.group_members.index(user_id)]
+            logger.info(f'{user_id} leave from group')
+
+
+class MessageHandler:
     TYPES = [UpdateType.MESSAGE_NEW]
 
     def __init__(self, target, pattern, state: State or list = State.ALL,
