@@ -54,7 +54,9 @@ async def withdraw_handler_1(session: Session):
     await session.set_state(State.WITHDRAW)
 
     HandlerContext.pool.append(HandlerContext.api.messages.send.code(
-        user_id=session.user_id, message=Message.Withdraw, keyboard=HandlerContext.keyboards.get('main').get_keyboard()))
+        user_id=session.user_id,
+        message=Message.Withdraw,
+        keyboard=HandlerContext.keyboards.get('main').get_keyboard()))
 
 
 async def withdraw_handler_2(session: Session):

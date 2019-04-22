@@ -104,8 +104,13 @@ class CoinAPI:
 
     async def do_transfers(self):
         while True:
-            response = await self._send_request(*await self.transfers.get())
+            method_url, params = await self.transfers.get()
+            response = await self._send_request(method_url, params)
+            if 'error' in response and response['error']['message'] == 'ANOTHER_TRANSACTION_IN_PROGRESS_AT_SAME_TIME':
+                logger.warning(f'ANOTHER_TRANSACTION_IN_PROGRESS_AT_SAME_TIME add transaction again')
+                self.transfers.put_nowait((method_url, params))
             logger.warning(f'Sending coins! Response: {response}')
+            await asyncio.sleep(2)
 
     async def _send_request(self, url, params):
         async with self.session.post(url, json=params) as response:

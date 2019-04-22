@@ -1,4 +1,4 @@
 multidict
-aiovk
+aiohttp
 asyncpg
 six
