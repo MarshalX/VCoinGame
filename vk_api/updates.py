@@ -75,7 +75,7 @@ class UpdateManager:
     async def start(self):
         while True:
             updates = await self.longpoll.wait()
-            asyncio.create_task(self._process_updates(updates))
+            await self._process_updates(updates)
 
     def register_handler(self, handler):
         self._handlers.append(handler)
