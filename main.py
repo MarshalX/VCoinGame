@@ -262,7 +262,7 @@ async def main():
 
     async def get_trans():
         while True:
-            all_transactions = await transaction_manager.get_all_ids()
+            all_transactions = set(await transaction_manager.get_all_ids())
             transactions = await coin_api.get_transactions()
             transactions.extend(await coin_api.get_transactions(False))
             transactions = [transaction for transaction in transactions

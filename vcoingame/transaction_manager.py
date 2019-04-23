@@ -8,7 +8,7 @@ class TransactionManager:
         self.database = database
 
     async def get_all_ids(self):
-        result = await self.database.fetch('''SELECT tid FROM transactions''')
+        result = await self.database.fetch('''SELECT tid FROM transactions ORDER BY tid DESC LIMIT 1000''')
         return [r['tid'] for r in result]
 
     async def save_transaction(self, transaction):
