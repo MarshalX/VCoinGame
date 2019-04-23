@@ -179,9 +179,7 @@ async def get_members(api):
 
 
 async def main():
-    token_session = TokenSession(
-        access_token=os.environ.get('GROUP_TOKEN'),
-        driver=HttpDriver(timeout=10, session=aiohttp.ClientSession()))
+    token_session = TokenSession(access_token=os.environ.get('GROUP_TOKEN'), timeout=15)
     api = API(token_session)
     pool = Pool(api)
     longpoll = BotsLongPoll(api, mode=2, group_id=os.environ.get('GROUP_ID'))

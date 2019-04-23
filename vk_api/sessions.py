@@ -68,9 +68,7 @@ class TokenSession(BaseSession):
         params['v'] = self.API_VERSION
 
         # Send request
-        logger.debug(f'URL: {self.REQUEST_URL + method_name}; Params: {params}; Timeout: {timeout}')
         response = await self.driver.json(self.REQUEST_URL + method_name, params, timeout)
-        logger.debug(response)
 
         # Process response
         # Checking the section with errors

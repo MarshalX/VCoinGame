@@ -64,4 +64,4 @@ class Score:
     @staticmethod
     def parse_score(message):
         finds = re.findall(r'\d*[.,]?\d+', message)
-        return int(float(finds[0].replace(',', '.')) * 1000) if len(finds) else None
+        return int(float(finds[0].replace(',', '.')) * 1000) if len(finds) else 0

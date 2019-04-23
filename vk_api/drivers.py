@@ -1,27 +1,7 @@
 import aiohttp
+import logging
 
-from aiohttp import hdrs
-
-from multidict import CIMultiDict
-from multidict import CIMultiDictProxy
-
-
-class CustomClientResponse(aiohttp.ClientResponse):
-    # you have to use this class in response_class parameter of any aiohttp.ClientSession instance
-    # example: aiohttp.ClientSession(response_class=CustomClientResponse)
-    # read more: https://github.com/Fahreeve/aiovk/issues/3
-
-    async def start(self, connection, read_until_eof=False):
-        # vk.com return url like this: http://REDIRECT_URI#access_token=...
-        # but aiohttp by default removes all parameters after '#'
-        await super().start(connection)
-        headers = CIMultiDict(self._headers)
-        location = headers.get(hdrs.LOCATION, None)
-        if location:
-            headers[hdrs.LOCATION] = location.replace('#', '?')
-        self._headers = CIMultiDictProxy(headers)
-        self._raw_headers = tuple(headers.items())
-        return self
+logger = logging.getLogger('vk_api.drivers')
 
 
 class BaseDriver:
@@ -65,14 +45,14 @@ class HttpDriver(BaseDriver):
     def __init__(self, timeout=10, loop=None, session=None):
         super().__init__(timeout, loop)
         if not session:
-            self.session = aiohttp.ClientSession(
-                response_class=CustomClientResponse, loop=loop)
+            self.session = aiohttp.ClientSession(loop=loop)
         else:
             self.session = session
 
     async def json(self, url, data, timeout=None):
-        # timeouts - https://docs.aiohttp.org/en/v3.0.0/client_quickstart.html#timeouts
+        logger.debug(f'URL: {url}; Data: {data}; Timeout: {timeout}')
         async with self.session.post(url, data=data, timeout=timeout or self.timeout) as response:
+            logger.debug(f'Response: {await response.text()}')
             return await response.json()
 
     async def get_text(self, url, data, timeout=None):
