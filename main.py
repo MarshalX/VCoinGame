@@ -2,10 +2,8 @@ import os
 import random
 import asyncio
 import logging
-import aiohttp
 
 from vk_api.api import API
-from vk_api.drivers import HttpDriver
 from vk_api.execute import Pool
 from vk_api.sessions import TokenSession
 from vk_api.longpoll import BotsLongPoll
@@ -13,6 +11,7 @@ from vk_api.updates import UpdateManager
 from vk_api.keyboard import Keyboard, ButtonColor
 from vk_api.handlers import MessageHandler, GroupJoinHandler, GroupLeaveHandler
 
+from vcoingame.top import Top
 from vcoingame.score import Score
 from vcoingame.states import State
 from vcoingame.coin_api import CoinAPI
@@ -53,6 +52,68 @@ async def balance_handler(session: Session):
     HandlerContext.pool.append(HandlerContext.api.messages.send.code(
         user_id=session.user_id,
         message=Message.Score.format(session.score),
+        keyboard=HandlerContext.keyboards.get('main').get_keyboard()))
+
+
+async def leaderboards_handler_1(session: Session):
+    await session.set_state(State.TOP)
+
+    HandlerContext.pool.append(HandlerContext.api.messages.send.code(
+        user_id=session.user_id,
+        message=Message.Leaderboards,
+        keyboard=HandlerContext.keyboards.get('top').get_keyboard()))
+
+
+async def leaderboards_handler_2(session: Session):
+    text = session['message'].text
+    if 'выигранных игр' in text:
+        top_10 = session.top.WIN_TOP_10
+        position = session.top.win
+    elif 'шансу' in text:
+        top_10 = session.top.WINRATE_TOP_10
+        position = session.top.winrate
+    elif 'балансу' in text:
+        top_10 = session.top.SCORE_TOP_10
+        position = session.top.score
+    elif 'сыгранных' in text:
+        top_10 = session.top.GAMES_TOP_10
+        position = session.top.games
+    else:
+        top_10 = session.top.PROFIT_TOP_10
+        position = session.top.profit
+
+    msg = text + ':\n'
+    for top in top_10:
+        msg += Message.LeaderboardRow.format(top.user_id, top.number, top.value)
+
+    if position and position.number > 10:
+        msg += Message.LeaderboardSeparator
+        msg += Message.LeaderboardMyPosition.format(position.value, position.number)
+
+    HandlerContext.pool.append(HandlerContext.api.messages.send.code(
+        user_id=session.user_id,
+        message=msg,
+        keyboard=HandlerContext.keyboards.get('top').get_keyboard()))
+
+
+async def statistics_handler(session: Session):
+    msg = Message.Statistics.format(
+        session.top.games.value,
+        session.top.win.value,
+        session.top.games.value - session.top.win.value,
+        session.top.winrate.value if session.top.winrate else Message.WinrateError,
+        session.top.profit.value,
+
+        session.top.games.number,
+        session.top.win.number,
+        session.top.winrate.number if session.top.winrate else Message.WinrateError,
+        session.top.profit.number,
+        session.top.score.number
+    )
+
+    HandlerContext.pool.append(HandlerContext.api.messages.send.code(
+        user_id=session.user_id,
+        message=msg,
         keyboard=HandlerContext.keyboards.get('main').get_keyboard()))
 
 
@@ -189,6 +250,9 @@ async def main():
     database = await Database.create()
     sessions = SessionList(database)
 
+    top = Top(database)
+    await top.update_tops()
+
     transaction_manager = TransactionManager(database)
 
     main_keyboard = Keyboard()
@@ -197,6 +261,9 @@ async def main():
     main_keyboard.add_button('Пополнить')
     main_keyboard.add_button('Баланс')
     main_keyboard.add_button('Вывести')
+    main_keyboard.add_line()
+    main_keyboard.add_button('Доска лидеров')
+    main_keyboard.add_button('Статистика')
 
     bet_keyboard = Keyboard()
     bet_keyboard.add_button('0', color=ButtonColor.POSITIVE)
@@ -215,10 +282,24 @@ async def main():
     game_keyboard.add_button('Орёл', color=ButtonColor.PRIMARY)
     game_keyboard.add_button('Решка', color=ButtonColor.PRIMARY)
 
+    leaderboard_keyboard = Keyboard()
+    leaderboard_keyboard.add_button('Топ-10 по количеству выигранных игр')
+    leaderboard_keyboard.add_line()
+    leaderboard_keyboard.add_button('Топ-10 по шансу выигрыша')
+    leaderboard_keyboard.add_line()
+    leaderboard_keyboard.add_button('Топ-10 по внутриигровому балансу')
+    leaderboard_keyboard.add_line()
+    leaderboard_keyboard.add_button('Топ-10 по количество сыгранных игр')
+    leaderboard_keyboard.add_line()
+    leaderboard_keyboard.add_button('Топ-10 по количеству выигранных коинов')
+    leaderboard_keyboard.add_line()
+    leaderboard_keyboard.add_button('Назад', color=ButtonColor.PRIMARY)
+
     keyboards = {
         'main': main_keyboard,
         'game': game_keyboard,
-        'bet': bet_keyboard
+        'bet': bet_keyboard,
+        'top': leaderboard_keyboard
     }
 
     update_manager = UpdateManager(longpoll)
@@ -239,9 +320,10 @@ async def main():
         im_game_handler, '', State.GAME, reset_state=False, final=True))
 
     update_manager.register_handler(MessageHandler(
-        toss_handler_1, 'Бросить монету', reset_state=False))
+        help_handler, 'Назад', [State.BET, State.TOP]))
+
     update_manager.register_handler(MessageHandler(
-        help_handler, 'Назад', State.BET))
+        toss_handler_1, 'Бросить монету', reset_state=False))
     update_manager.register_handler(MessageHandler(
         toss_handler_2, r'\d*[.,]?\d+', State.BET, regex=True, reset_state=False))
 
@@ -250,6 +332,13 @@ async def main():
     update_manager.register_handler(MessageHandler(
         withdraw_handler_2, r'\d*[.,]?\d+', State.WITHDRAW, regex=True))
 
+    update_manager.register_handler(MessageHandler(
+        leaderboards_handler_1, 'Доска лидеров', reset_state=False))
+    update_manager.register_handler(MessageHandler(
+        leaderboards_handler_2, 'Топ-10', State.TOP, reset_state=False))
+
+    update_manager.register_handler(MessageHandler(
+        statistics_handler, 'Статистика'))
     update_manager.register_handler(MessageHandler(
         deposit_handler, 'Пополнить'))
     update_manager.register_handler(MessageHandler(
@@ -287,8 +376,9 @@ async def main():
     await asyncio.gather(
         pool.start(),
         update_manager.start(),
-        coin_api.do_transfers(),
-        get_trans()
+        # coin_api.do_transfers(),
+        # get_trans(),
+        top.start()
     )
 
 if __name__ == '__main__':

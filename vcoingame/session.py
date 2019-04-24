@@ -1,5 +1,6 @@
 import logging
 
+from vcoingame.top import Top
 from vcoingame.score import Score
 from vcoingame.states import State
 from vcoingame.statistics import Statistics
@@ -13,7 +14,7 @@ class Session:
         self.database = database
         self.state = state
         self.bet = 0
-        self.statistics = self.score = None
+        self.statistics = self.score = self.top = None
         self._fields = {}
 
     async def initial(self):
@@ -21,6 +22,7 @@ class Session:
         self.state = await self.get_state()
         self.bet = await self.get_bet()
         self.statistics = Statistics(self.database, self.user_id)
+        self.top = Top(self.database, self.user_id)
 
         return self
 

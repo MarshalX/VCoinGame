@@ -8,3 +8,4 @@ class State(Enum):
     GAME = 1
     WITHDRAW = 3
     BET = 4
+    TOP = 5
