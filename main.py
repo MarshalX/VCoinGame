@@ -376,8 +376,8 @@ async def main():
     await asyncio.gather(
         pool.start(),
         update_manager.start(),
-        # coin_api.do_transfers(),
-        # get_trans(),
+        coin_api.do_transfers(),
+        get_trans(),
         top.start()
     )
 
