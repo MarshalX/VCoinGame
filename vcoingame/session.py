@@ -18,11 +18,14 @@ class Session:
         self._fields = {}
 
     async def initial(self):
-        self.score = await Score.get_or_create(self.database, self.user_id)
+        self.score, new_user = await Score.get_or_create(self.database, self.user_id)
         self.state = await self.get_state()
         self.bet = await self.get_bet()
         self.statistics = Statistics(self.database, self.user_id)
+
         self.top = Top(self.database, self.user_id)
+        if new_user:
+            self.top.create()
 
         return self
 

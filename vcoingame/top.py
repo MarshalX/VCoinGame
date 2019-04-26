@@ -91,6 +91,17 @@ class Top:
         Top.SCORE_TOP_10 = self.__update_top_10(result)
         self.__update_top(Top._SCORE_TOP, result)
 
+    def create(self):
+        logger.info(f'Add new user to the top')
+        position = Position({'user_id': self.user_id, 'position': 0, 'value': 0})
+        data = {self.user_id: position}
+
+        Top._WIN_TOP.update(data)
+        Top._WINRATE_TOP.update(data)
+        Top._SCORE_TOP.update(data)
+        Top._GAMES_TOP.update(data)
+        Top._PROFIT_TOP.update(data)
+
     async def update_tops(self):
         await self._update_win_top()
         await self._update_winrate_top()

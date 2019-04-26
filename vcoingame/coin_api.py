@@ -2,6 +2,7 @@ import aiohttp
 import asyncio
 import logging
 
+from datetime import datetime
 from enum import Enum
 
 logger = logging.getLogger('vcoingame.coin_api')
@@ -23,13 +24,13 @@ class Transaction:
                  created_at):
         super().__init__()
 
-        self.id = id
-        self.from_id = from_id
-        self.to_id = to_id
+        self.id = int(id)
+        self.from_id = int(from_id)
+        self.to_id = int(to_id)
         self.amount = int(amount)
         self.type = Transaction.Type(type)
-        self.payload = payload
-        self.external_id = external_id
+        self.payload = int(payload)
+        self.external_id = int(external_id)
         self.created_at = created_at
 
     @staticmethod
@@ -46,7 +47,8 @@ class Transaction:
         )
 
     def __str__(self):
-        return f'ID: {self.id}; FROM: {self.from_id}; TO: {self.to_id}; AMOUNT: {self.amount}; TYPE {self.type}'
+        return f'ID: {self.id}; FROM: {self.from_id}; TO: {self.to_id}; AMOUNT: {self.amount}; ' \
+            f'TYPE {self.type}; PAYLOAD: {self.payload}; CREATED AT: {datetime.fromtimestamp(self.created_at)}'
 
     def __repr__(self):
         return self.__str__()
@@ -106,10 +108,14 @@ class CoinAPI:
         while True:
             method_url, params = await self.transfers.get()
             response = await self._send_request(method_url, params)
-            if 'error' in response and response['error']['message'] == 'ANOTHER_TRANSACTION_IN_PROGRESS_AT_SAME_TIME':
-                logger.warning(f'ANOTHER_TRANSACTION_IN_PROGRESS_AT_SAME_TIME add transaction again')
-                self.transfers.put_nowait((method_url, params))
-            logger.warning(f'Sending coins! Response: {response}')
+            if 'error' in response:
+                logger.error(f'Cant send coins. Response: {response}; Params: {params}')
+
+                if response['error']['message'] == 'ANOTHER_TRANSACTION_IN_PROGRESS_AT_SAME_TIME':
+                    logger.warning(f'ANOTHER_TRANSACTION_IN_PROGRESS_AT_SAME_TIME add transaction again')
+                    self.transfers.put_nowait((method_url, params))
+
+            logger.info(f'Sending coins! Response: {response}; Params: {params}')
             await asyncio.sleep(2)
 
     async def _send_request(self, url, params):

@@ -15,12 +15,13 @@ class Score:
     @staticmethod
     async def get_or_create(database: Database, user_id):
         score = Score(database, user_id)
-        if await score.is_exists():
+        is_exists = await score.is_exists()
+        if is_exists:
             await score.get()
         else:
             await score.create()
 
-        return score
+        return score, not is_exists
 
     async def is_exists(self):
         logger.info(f'Check on exists {self.user_id}')
