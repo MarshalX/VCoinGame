@@ -50,6 +50,7 @@ async def vcoinbank_handler(session: Session):
     code, short_link = await driver.get_text('https://clck.ru/--', params={'url': url})
 
     if code != 200:
+        logger.error(f'Cant get short link! {code}: {short_link}')
         return
 
     msg = Message.VCoinBank.format(short_link)
