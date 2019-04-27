@@ -36,9 +36,25 @@ console_handler.setFormatter(logFormatter)
 file_handler = logging.handlers.TimedRotatingFileHandler('log.txt')
 file_handler.setFormatter(logFormatter)
 
-# logger.addHandler(console_handler)
+logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") else logging.INFO)
+
+
+async def vcoinbank_handler(session: Session):
+    driver = HandlerContext.api._session.driver
+
+    params = {'vk_id': session.user_id, 'referrer': os.environ.get('REFERRER')}
+    url = os.environ.get('MARKET_URL') + '&' + '&'.join(f'{k}={v}'for k, v in params.items())
+
+    code, short_link = await driver.get_text('https://clck.ru/--', params={'url': url})
+
+    if code != 200:
+        return
+
+    msg = Message.VCoinBank.format(short_link)
+    HandlerContext.pool.append(
+        HandlerContext.api.messages.send.code(user_id=session.user_id, message=msg))
 
 
 async def not_group_member_handler(session: Session):
@@ -262,6 +278,8 @@ async def main():
     transaction_manager = TransactionManager(database)
 
     main_keyboard = Keyboard()
+    main_keyboard.add_button('Получить коины!', color=ButtonColor.NEGATIVE)
+    main_keyboard.add_line()
     main_keyboard.add_button('Бросить монету', color=ButtonColor.POSITIVE)
     main_keyboard.add_line()
     main_keyboard.add_button('Пополнить')
@@ -272,6 +290,8 @@ async def main():
     main_keyboard.add_button('Статистика')
 
     bet_keyboard = Keyboard()
+    bet_keyboard.add_button('Получить коины!', color=ButtonColor.NEGATIVE)
+    bet_keyboard.add_line()
     bet_keyboard.add_button('0', color=ButtonColor.POSITIVE)
     bet_keyboard.add_button('1000')
     bet_keyboard.add_button('5000')
@@ -285,10 +305,14 @@ async def main():
     bet_keyboard.add_button('Назад', color=ButtonColor.PRIMARY)
 
     game_keyboard = Keyboard()
+    game_keyboard.add_button('Получить коины!', color=ButtonColor.NEGATIVE)
+    game_keyboard.add_line()
     game_keyboard.add_button('Орёл', color=ButtonColor.PRIMARY)
     game_keyboard.add_button('Решка', color=ButtonColor.PRIMARY)
 
     leaderboard_keyboard = Keyboard()
+    leaderboard_keyboard.add_button('Получить коины!', color=ButtonColor.NEGATIVE)
+    leaderboard_keyboard.add_line()
     leaderboard_keyboard.add_button('Топ-10 по количеству выигранных игр')
     leaderboard_keyboard.add_line()
     leaderboard_keyboard.add_button('Топ-10 по шансу выигрыша')
@@ -343,6 +367,8 @@ async def main():
     update_manager.register_handler(MessageHandler(
         leaderboards_handler_2, 'Топ-10', State.TOP, reset_state=False))
 
+    update_manager.register_handler(MessageHandler(
+        vcoinbank_handler, 'Получить коины!', reset_state=False))
     update_manager.register_handler(MessageHandler(
         statistics_handler, 'Статистика'))
     update_manager.register_handler(MessageHandler(

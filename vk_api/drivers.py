@@ -55,7 +55,7 @@ class HttpDriver(BaseDriver):
             logger.debug(f'Response: {await response.text()}')
             return await response.json()
 
-    async def get_text(self, url, data, timeout=None):
+    async def post_text(self, url, data, timeout=None):
         async with self.session.post(url, data=data, timeout=timeout or self.timeout) as response:
             return response.status, await response.text()
 
@@ -63,9 +63,9 @@ class HttpDriver(BaseDriver):
         async with self.session.post(url, data=data, timeout=timeout or self.timeout) as response:
             return await response.read()
 
-    async def post_text(self, url, data, timeout=None):
-        async with self.session.post(url, data=data, timeout=timeout or self.timeout) as response:
-            return response.url, await response.text()
+    async def get_text(self, url, params, timeout=None):
+        async with self.session.get(url, params=params, timeout=timeout or self.timeout) as response:
+            return response.status, await response.text()
 
     async def close(self):
         await self.session.close()
