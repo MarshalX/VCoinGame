@@ -89,4 +89,5 @@ class SessionList:
 
         session = await Session.create(self.database, user_id)
         self.append(user_id, session)
+
         return session

@@ -1,20 +1,27 @@
 import re
 import logging
 
+from abc import ABC, abstractmethod
+
 from vk_api.updates import UpdateType, Update
 
-from vcoingame.handler_payload import HandlerContext
+from vcoingame.handler_context import HandlerContext
 from vcoingame.states import State
 
 
 logger = logging.getLogger('vcoingame.handlers')
 
 
-class GroupHandler:
+class GroupHandler(ABC):
     final = False
 
-    async def check(self, object):
+    @staticmethod
+    async def check(object):
         return True
+
+    @abstractmethod
+    async def start(self, update: Update):
+        raise NotImplementedError
 
 
 class GroupJoinHandler(GroupHandler):
@@ -41,12 +48,13 @@ class MessageHandler:
     TYPES = [UpdateType.MESSAGE_NEW]
 
     def __init__(self, target, pattern, state: State or list = State.ALL,
-                 reset_state=True, regex=False, final=True):
+                 reset_state=True, regex=False, final=True, equal=True):
         self.target = target
         self.regex = regex
         self.regex_result = None
         self.final = final
         self.pattern = pattern
+        self.equal = equal
         self.state = state if isinstance(state, list) else [state]
         self.reset_state = reset_state
 
@@ -58,12 +66,14 @@ class MessageHandler:
         if self.regex:
             self.regex_result = re.findall(self.pattern, message.text)
             return len(self.regex_result) > 0
+        elif self.equal:
+            return self.pattern == message.text
         else:
             return self.pattern in message.text
 
     async def start(self, update: Update):
         message = update.object
-        session = await HandlerContext.sessions.get_or_create(message.from_id)
+        session = await HandlerContext.sessions.get_or_create(message.from_id) # Too bad it's here
 
         session['update'] = update
         session['regex_result'] = self.regex_result

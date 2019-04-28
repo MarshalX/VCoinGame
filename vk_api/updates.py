@@ -1,4 +1,3 @@
-import asyncio
 import logging
 
 from enum import Enum
@@ -28,6 +27,8 @@ class Update:
                 self.object = Message.to_python(update.get('object'))
             elif self.type in [UpdateType.GROUP_LEAVE, UpdateType.GROUP_JOIN]:
                 self.object = update.get('object')
+            else:
+                self.object = update.get('object')
         else:
             self.type = type
             self.object = object
@@ -54,7 +55,8 @@ class UpdateManager:
             response = await self.api.messages.getConversations(filter='unanswered', offset=offset, count=200)
 
             for conversation in response.get('items'):
-                updates.append(Update(type=UpdateType.MESSAGE_NEW, object=Message.to_python(conversation.get('last_message'))))
+                updates.append(
+                    Update(type=UpdateType.MESSAGE_NEW, object=Message.to_python(conversation.get('last_message'))))
 
             if response.get('count') <= offset + 200:
                 break
@@ -74,9 +76,7 @@ class UpdateManager:
 
     async def start(self):
         while True:
-            updates = await self.longpoll.wait()
-            await self._process_updates(updates)
+            await self._process_updates(await self.longpoll.wait())
 
     def register_handler(self, handler):
         self._handlers.append(handler)
-

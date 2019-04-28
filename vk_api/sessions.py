@@ -48,7 +48,7 @@ class TokenSession(BaseSession):
         """
         self.timeout = timeout
         self.access_token = access_token
-        self.driver = HttpDriver(timeout) if driver is None else driver
+        self.driver = driver if driver else HttpDriver(timeout)
 
     async def __aenter__(self) -> BaseSession:
         """Make available usage of `async with` context manager"""
@@ -58,47 +58,38 @@ class TokenSession(BaseSession):
         return await self.driver.close()
 
     async def send_api_request(self, method_name: str, params: dict = None, timeout: int = None) -> dict:
-        # Prepare request
-        if not timeout:
-            timeout = self.timeout
-        if not params:
-            params = {}
+        timeout = self.timeout if not timeout else timeout
+        params = {} if not params else params
+
         if self.access_token:
             params['access_token'] = self.access_token
         params['v'] = self.API_VERSION
 
-        # Send request
         response = await self.driver.json(self.REQUEST_URL + method_name, params, timeout)
 
-        # Process response
-        # Checking the section with errors
         error = response.get('error')
         if error:
             err_code = error.get('error_code')
             logger.error(f'{error}; err_code: {err_code}')
             if err_code == CAPTCHA_IS_NEEDED:
-                # Collect information about Captcha
                 captcha_sid = error.get('captcha_sid')
                 captcha_url = error.get('captcha_img')
+
                 params['captcha_key'] = await self.enter_captcha(captcha_url, captcha_sid)
                 params['captcha_sid'] = captcha_sid
-                # Send request again
-                # Provide one attempt to repeat the request
+
                 return await self.send_api_request(method_name, params, timeout)
             elif err_code == AUTHORIZATION_FAILED:
                 await self.authorize()
-                # Send request again
-                # Provide one attempt to repeat the request
+
                 return await self.send_api_request(method_name, params, timeout)
             else:
-                # Other errors is not related with security
                 raise VkAPIError(error, self.REQUEST_URL + method_name)
-        # Must return only useful data
+
         return response['response']
 
     async def authorize(self) -> None:
         """Getting a new token from server"""
-        # For `TokenSession` we have not credentials for getting new token
         raise VkAuthError('invalid_token', 'User authorization failed')
 
     async def enter_captcha(self, url: str, sid: str) -> str:

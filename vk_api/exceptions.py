@@ -2,7 +2,7 @@ import urllib.parse
 
 
 CAPTCHA_IS_NEEDED = 14
-AUTHORIZATION_FAILED = 5  # invalid access token
+AUTHORIZATION_FAILED = 5
 
 
 def get_request_params(request_params):

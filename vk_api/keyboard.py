@@ -11,6 +11,8 @@ class ButtonColor(Enum):
 
 
 class Keyboard:
+    __slots__ = ('one_time', 'lines', 'keyboard')
+
     def __init__(self, one_time=False):
         self.one_time = one_time
         self.lines = [[]]

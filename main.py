@@ -20,7 +20,7 @@ from vcoingame.coin_api import CoinAPI
 from vcoingame.messages import Message
 from vcoingame.database import Database
 from vcoingame.session import SessionList, Session
-from vcoingame.handler_payload import HandlerContext
+from vcoingame.handler_context import HandlerContext
 from vcoingame.transaction_manager import TransactionManager
 
 
@@ -42,8 +42,6 @@ logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") else logging.INFO)
 
 
 async def vcoinbank_handler(session: Session):
-    driver = HandlerContext.api._session.driver
-
     params = {'vk_id': session.user_id, 'referrer': os.environ.get('REFERRER')}
     url = os.environ.get('MARKET_URL') + '&' + '&'.join(f'{k}={v}'for k, v in params.items())
 
@@ -191,9 +189,7 @@ async def toss_handler_2(session: Session):
         kbr = 'main'
     else:
         await session.set_state(State.GAME)
-
         await session.statistics.add_bet(amount)
-
         await session.score.sub(session.bet)
 
         msg = Message.BetMade.format(amount * 2 / 1000)
@@ -217,7 +213,7 @@ async def game_handler(session: Session):
     not_user_choice_img = 'HEADS_IMG' if session['message'].text == 'Решка' else 'TAILS_IMG'
     user_choice_img = 'HEADS_IMG' if session['message'].text == 'Орёл' else 'TAILS_IMG'
 
-    if random.randint(0, 100) < int(os.environ.get('WIN_RATE')):
+    if random.randint(1, 100) <= int(os.environ.get('WIN_RATE')):
         msg = Message.Win.format(session.bet * 2 / 1000)
         img = os.environ.get(user_choice_img)
 
@@ -300,8 +296,6 @@ async def main():
     bet_keyboard.add_button('Назад', color=ButtonColor.PRIMARY)
 
     game_keyboard = Keyboard()
-    game_keyboard.add_button('Получить коины!', color=ButtonColor.NEGATIVE)
-    game_keyboard.add_line()
     game_keyboard.add_button('Орёл', color=ButtonColor.PRIMARY)
     game_keyboard.add_button('Решка', color=ButtonColor.PRIMARY)
 
@@ -335,14 +329,14 @@ async def main():
     update_manager.register_handler(GroupLeaveHandler())
 
     update_manager.register_handler(MessageHandler(
-        not_group_member_handler, '', final=False, reset_state=False))
+        not_group_member_handler, '', final=False, reset_state=False, equal=False))
 
     update_manager.register_handler(MessageHandler(
         game_handler, 'Орёл', State.GAME))
     update_manager.register_handler(MessageHandler(
         game_handler, 'Решка', State.GAME))
     update_manager.register_handler(MessageHandler(
-        im_game_handler, '', State.GAME, reset_state=False, final=True))
+        im_game_handler, '', State.GAME, reset_state=False, final=True, equal=False))
 
     update_manager.register_handler(MessageHandler(
         help_handler, 'Назад', [State.BET, State.TOP]))
@@ -360,7 +354,7 @@ async def main():
     update_manager.register_handler(MessageHandler(
         leaderboards_handler_1, 'Доска лидеров', reset_state=False))
     update_manager.register_handler(MessageHandler(
-        leaderboards_handler_2, 'Топ-10', State.TOP, reset_state=False))
+        leaderboards_handler_2, 'Топ-10', State.TOP, reset_state=False, equal=False))
 
     update_manager.register_handler(MessageHandler(
         vcoinbank_handler, 'Получить коины!', reset_state=False))
@@ -372,7 +366,7 @@ async def main():
         balance_handler, 'Баланс'))
 
     update_manager.register_handler(MessageHandler(
-        help_handler, ''))
+        help_handler, '', equal=False))
 
     asyncio.create_task(update_manager.process_unread_conversation())
 

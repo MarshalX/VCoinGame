@@ -1,4 +1,3 @@
-import six
 import json
 import asyncio
 import logging
@@ -23,8 +22,8 @@ class Pool:
             methods.append(self._pool.get_nowait())
 
         logger.info(f'Pool queue size: {self._pool.qsize()}; Current methods in request: {len(methods)}')
-        methods = ','.join(methods)
-        return f'return [{methods}];'
+
+        return f"return [{','.join(methods)}];"
 
     def append(self, request):
         self._pool.put_nowait(request)
@@ -45,7 +44,7 @@ class Function:
     def __call__(self, **method_args):
         compiled_args = {}
 
-        for key, value in six.iteritems(method_args):
+        for key, value in method_args.items():
             if key in method_args:
                 compiled_args[key] = str(value)
             else:

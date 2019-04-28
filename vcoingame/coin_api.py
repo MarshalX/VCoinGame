@@ -2,8 +2,8 @@ import aiohttp
 import asyncio
 import logging
 
-from datetime import datetime
 from enum import Enum
+from datetime import datetime
 
 logger = logging.getLogger('vcoingame.coin_api')
 

@@ -60,7 +60,7 @@ class BaseLongPoll(ABC):
             'key': self.key,
         }
         params.update(self.base_params)
-        # invalid mimetype from server
+
         code, response = await self.api._session.driver.get_text(
             self.base_url, params,
             timeout=self.base_params['wait']
@@ -80,11 +80,7 @@ class BaseLongPoll(ABC):
             self.ts = response['ts']
         elif failed == 4:
             raise VkLongPollError(
-                4,
-                'An invalid version number was passed in the version parameter',
-                self.base_url + '/',
-                params
-            )
+                4,'An invalid version number was passed in the version parameter', self.base_url + '/', params)
         else:
             self.base_url = None
 
@@ -111,4 +107,4 @@ class BotsLongPoll(BaseLongPoll):
         self.pts = response.get('pts')
         self.ts = response['ts']
         self.key = response['key']
-        self.base_url = '{}'.format(response['server'])  # Method already returning url with https://
+        self.base_url = '{}'.format(response['server'])

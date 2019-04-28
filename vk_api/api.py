@@ -1,8 +1,14 @@
+import logging
+
 from vk_api.exceptions import VkException
 from vk_api.execute import Function
 
+logger = logging.getLogger('vk_api.api')
+
 
 class API:
+    __slots__ = '_session'
+
     def __init__(self, session):
         self._session = session
 
@@ -29,10 +35,6 @@ class Request:
         timeout = method_args.pop('timeout', None)
         self._method_args = method_args
         try:
-            return await self._api._session.send_api_request(
-                self._method_name,
-                method_args,
-                timeout,
-            )
-        except VkException:
-            pass
+            return await self._api._session.send_api_request(self._method_name, method_args, timeout)
+        except VkException as e:
+            logger.error(f'The following exception occurred: {e}')
