@@ -113,6 +113,7 @@ async def leaderboards_handler_2(session: Session):
 
 async def statistics_handler(session: Session):
     msg = Message.Statistics.format(
+        session.max_bet,
         session.top.games.value,
         session.top.win.value,
         session.top.games.value - session.top.win.value,
@@ -179,8 +180,14 @@ async def raise_max_bet_1(session: Session):
 
 async def raise_max_bet_2(session: Session):
     amount = Score.parse_score(session['message'].text)
+
+    if amount < 1000:
+        HandlerContext.pool.append(HandlerContext.api.messages.send.code(
+            user_id=session.user_id, message=Message.RaiseTooLower))
+        return
+
     rate = float(os.environ.get('RATE'))
-    price = amount ** rate
+    price = round((((session.max_bet + amount) / 1000) ** rate) - ((session.max_bet / 1000) ** rate)) * 1000
 
     if price > session.score.score:
         HandlerContext.pool.append(HandlerContext.api.messages.send.code(
@@ -190,7 +197,7 @@ async def raise_max_bet_2(session: Session):
     await session.score.sub(price)
     await session.add_to_max_bet(amount)
 
-    msg = Message.Raise.format(amount / 1000)
+    msg = Message.Raise.format(amount / 1000, price / 1000)
     HandlerContext.pool.append(HandlerContext.api.messages.send.code(
         user_id=session.user_id, message=msg, keyboard=HandlerContext.keyboards.get('main').get_keyboard()))
 
@@ -308,8 +315,8 @@ async def main():
     main_keyboard.add_button('Бросить монету', color=ButtonColor.POSITIVE)
     main_keyboard.add_button('Получить коины!', color=ButtonColor.POSITIVE)
     main_keyboard.add_line()
-    main_keyboard.add_button('Повысить максимальную ставку', color=ButtonColor.NEGATIVE)
-    main_keyboard.add_line()
+    # main_keyboard.add_button('Повысить максимальную ставку', color=ButtonColor.NEGATIVE)
+    # main_keyboard.add_line()
     main_keyboard.add_button('Пополнить')
     main_keyboard.add_button('Баланс')
     main_keyboard.add_button('Вывести')
