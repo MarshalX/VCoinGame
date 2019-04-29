@@ -14,6 +14,8 @@ class Session:
         self.database = database
         self.state = state
         self.bet = 0
+        self.max_bet = 0
+        self.donation_amount = 0
         self.statistics = self.score = self.top = None
         self._fields = {}
 
@@ -21,6 +23,8 @@ class Session:
         self.score, new_user = await Score.get_or_create(self.database, self.user_id)
         self.state = await self.get_state()
         self.bet = await self.get_bet()
+        self.max_bet = await self.get_max_bet()
+        self.donation_amount = await self.get_donation_amount()
         self.statistics = Statistics(self.database, self.user_id)
 
         self.top = Top(self.database, self.user_id)
@@ -33,11 +37,33 @@ class Session:
     async def create(database, user_id):
         return await Session(database, user_id).initial()
 
+    async def get_donation_amount(self):
+        logger.info(f'Get {self.user_id}`s donation amount')
+        self.donation_amount = await self.database.fetchval(
+            '''SELECT
+                    sum(replace(data::json->>'amount_usd', ',', '.')::float)
+               FROM merchant_info
+               INNER JOIN used_codes ON user_id = ($1::int)
+               WHERE merchant_info.code = used_codes.code''', self.user_id)
+        return self.donation_amount
+
+    async def get_max_bet(self):
+        logger.info(f'Get {self.user_id}`s max bet')
+        self.max_bet = await self.database.fetchval(
+            '''SELECT max_bet FROM user_scores WHERE user_id = ($1::int)''', self.user_id)
+        return self.max_bet
+
     async def get_bet(self):
         logger.info(f'Get {self.user_id}`s current bet')
         self.bet = await self.database.fetchval(
             '''SELECT current_bet FROM user_scores WHERE user_id = ($1::int)''', self.user_id)
         return self.bet
+
+    async def add_to_max_bet(self, max_bet):
+        logger.info(f'Set max bet for {self.user_id}')
+        await self.database.fetchval(
+            '''UPDATE user_scores SET max_bet = max_bet + ($1::bigint) WHERE user_id = ($2::int)''', max_bet, self.user_id)
+        self.max_bet += max_bet
 
     async def set_bet(self, bet):
         logger.info(f'Set current bet for {self.user_id}')

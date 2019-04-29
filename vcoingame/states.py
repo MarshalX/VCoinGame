@@ -9,3 +9,4 @@ class State(Enum):
     WITHDRAW = 3
     BET = 4
     TOP = 5
+    RAISE = 6

@@ -158,6 +158,43 @@ async def withdraw_handler_2(session: Session):
         user_id=session.user_id, message=msg, keyboard=HandlerContext.keyboards.get('main').get_keyboard()))
 
 
+async def raise_max_bet_1(session: Session):
+    donation_amount = await session.get_donation_amount()
+    donation_amount = donation_amount if donation_amount else 0
+
+    donation_needed = float(os.environ.get('DONATION_LIMIT'))
+    if donation_needed > donation_amount:
+        HandlerContext.pool.append(HandlerContext.api.messages.send.code(
+            user_id=session.user_id,
+            message=Message.DonationError.format(donation_needed - donation_amount),
+            keyboard=HandlerContext.keyboards.get('main').get_keyboard()))
+    else:
+        await session.set_state(State.RAISE)
+
+        HandlerContext.pool.append(HandlerContext.api.messages.send.code(
+            user_id=session.user_id,
+            message=Message.RaiseInput,
+            keyboard=HandlerContext.keyboards.get('main').get_keyboard()))
+
+
+async def raise_max_bet_2(session: Session):
+    amount = Score.parse_score(session['message'].text)
+    rate = float(os.environ.get('RATE'))
+    price = amount ** rate
+
+    if price > session.score.score:
+        HandlerContext.pool.append(HandlerContext.api.messages.send.code(
+            user_id=session.user_id, message=Message.BumLeft.format((price - session.score.score) / 1000)))
+        return
+
+    await session.score.sub(price)
+    await session.add_to_max_bet(amount)
+
+    msg = Message.Raise.format(amount / 1000)
+    HandlerContext.pool.append(HandlerContext.api.messages.send.code(
+        user_id=session.user_id, message=msg, keyboard=HandlerContext.keyboards.get('main').get_keyboard()))
+
+
 async def deposit_handler(session: Session):
     msg = Message.Deposit.format(HandlerContext.coin_api.create_transaction_url(0, fixed=False))
     HandlerContext.pool.append(HandlerContext.api.messages.send.code(
@@ -175,12 +212,11 @@ async def toss_handler_2(session: Session):
     amount = Score.parse_score(session['message'].text)
     await session.set_bet(amount)
     user_score = session.score.score
-    max_bet = int(os.environ.get('MAX_BET'))
 
-    if amount > max_bet:
+    if amount > session.max_bet:
         await session.set_state(State.BET)
 
-        msg = Message.OverMaxBet.format(max_bet / 1000)
+        msg = Message.OverMaxBet.format(session.max_bet / 1000)
         kbr = 'bet'
     elif amount > user_score:
         await session.set_state(State.ALL)
@@ -269,9 +305,10 @@ async def main():
     transaction_manager = TransactionManager(database)
 
     main_keyboard = Keyboard()
-    main_keyboard.add_button('Получить коины!', color=ButtonColor.NEGATIVE)
-    main_keyboard.add_line()
     main_keyboard.add_button('Бросить монету', color=ButtonColor.POSITIVE)
+    main_keyboard.add_button('Получить коины!', color=ButtonColor.POSITIVE)
+    main_keyboard.add_line()
+    main_keyboard.add_button('Повысить максимальную ставку', color=ButtonColor.NEGATIVE)
     main_keyboard.add_line()
     main_keyboard.add_button('Пополнить')
     main_keyboard.add_button('Баланс')
@@ -350,6 +387,11 @@ async def main():
         withdraw_handler_1, 'Вывести', reset_state=False))
     update_manager.register_handler(MessageHandler(
         withdraw_handler_2, r'\d*[.,]?\d+', State.WITHDRAW, regex=True))
+
+    # update_manager.register_handler(MessageHandler(
+    #     raise_max_bet_1, 'Повысить максимальную ставку', reset_state=False))
+    # update_manager.register_handler(MessageHandler(
+    #     raise_max_bet_2, r'\d*[.,]?\d+', State.RAISE, regex=True))
 
     update_manager.register_handler(MessageHandler(
         leaderboards_handler_1, 'Доска лидеров', reset_state=False))

@@ -1,3 +1,4 @@
+import os
 import re
 import logging
 
@@ -31,8 +32,8 @@ class Score:
     async def create(self):
         logger.info(f'Create score for {self.user_id}')
         await self.database.fetchval(
-            '''INSERT INTO user_scores (user_id, score) VALUES (($1::int), ($2::bigint))''',
-            self.user_id, 0)
+            '''INSERT INTO user_scores (user_id, score, max_bet) VALUES (($1::int), ($2::bigint), ($3::bigint))''',
+            self.user_id, 0, int(os.environ.get('START_MAX_BET')))
         self.score = 0
 
     async def set(self, amount):
