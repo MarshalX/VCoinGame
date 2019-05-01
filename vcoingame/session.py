@@ -1,5 +1,7 @@
 import logging
 
+from vk_api.keyboard import Keyboard, ButtonColor
+
 from vcoingame.top import Top
 from vcoingame.score import Score
 from vcoingame.states import State
@@ -16,6 +18,7 @@ class Session:
         self.bet = 0
         self.max_bet = 0
         self.donation_amount = 0
+        self.bet_keyboard = None
         self.statistics = self.score = self.top = None
         self._fields = {}
 
@@ -26,6 +29,7 @@ class Session:
         self.max_bet = await self.get_max_bet()
         self.donation_amount = await self.get_donation_amount()
         self.statistics = Statistics(self.database, self.user_id)
+        self.bet_keyboard = await self.generate_bet_keyboard(self.max_bet)
 
         self.top = Top(self.database, self.user_id)
         if new_user:
@@ -37,14 +41,42 @@ class Session:
     async def create(database, user_id):
         return await Session(database, user_id).initial()
 
+    @staticmethod
+    async def generate_bet_keyboard(max_bet: int):
+        count = 8
+        start = 0
+        stop = int(max_bet / 1000)
+
+        bets = [round(int(stop + x * (start - stop) / (count - 1)), -3) for x in range(count)]
+        bets.reverse()
+
+        bet_keyboard = Keyboard()
+        bet_keyboard.add_button('Повысить максимальную ставку', color=ButtonColor.POSITIVE)
+        bet_keyboard.add_line()
+
+        for i, bet in enumerate(bets):
+            button_number = i + 1
+            if not button_number % 5:
+                bet_keyboard.add_line()
+            if button_number == count:
+                bet_keyboard.add_button(stop, color=ButtonColor.NEGATIVE)
+                continue
+
+            color = ButtonColor.POSITIVE if button_number == 1 else ButtonColor.DEFAULT
+            bet_keyboard.add_button(bet, color=color)
+
+        bet_keyboard.add_line()
+        bet_keyboard.add_button('Назад', color=ButtonColor.PRIMARY)
+
+        return bet_keyboard
+
     async def get_donation_amount(self):
         logger.info(f'Get {self.user_id}`s donation amount')
         self.donation_amount = await self.database.fetchval(
             '''SELECT
-                    sum(replace(data::json->>'amount_usd', ',', '.')::float)
-               FROM merchant_info
-               INNER JOIN used_codes ON user_id = ($1::int)
-               WHERE merchant_info.code = used_codes.code''', self.user_id)
+                    sum(coins)
+               FROM used_codes
+               WHERE user_id = ($1::int)''', self.user_id)
         return self.donation_amount
 
     async def get_max_bet(self):
@@ -64,6 +96,7 @@ class Session:
         await self.database.fetchval(
             '''UPDATE user_scores SET max_bet = max_bet + ($1::bigint) WHERE user_id = ($2::int)''', max_bet, self.user_id)
         self.max_bet += max_bet
+        self.bet_keyboard = await self.generate_bet_keyboard(self.max_bet)
 
     async def set_bet(self, bet):
         logger.info(f'Set current bet for {self.user_id}')
