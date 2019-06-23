@@ -3,7 +3,7 @@ import random
 import asyncio
 import logging
 
-from logging.handlers import RotatingFileHandler
+#from logging.handlers import RotatingFileHandler
 
 from vk_api.api import API
 from vk_api.execute import Pool
@@ -33,11 +33,11 @@ logger = logging.getLogger()
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(logFormatter)
 
-file_handler = logging.handlers.TimedRotatingFileHandler('log.txt')
-file_handler.setFormatter(logFormatter)
+#file_handler = logging.handlers.TimedRotatingFileHandler('log.txt')
+#file_handler.setFormatter(logFormatter)
 
 logger.addHandler(console_handler)
-logger.addHandler(file_handler)
+#logger.addHandler(file_handler)
 logger.setLevel(logging.DEBUG if os.environ.get("DEBUG") else logging.INFO)
 
 
